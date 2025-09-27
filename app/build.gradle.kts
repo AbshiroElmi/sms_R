@@ -37,12 +37,12 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.constraintlayout)
 
-    // Newly added:
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("androidx.work:work-runtime:2.9.1")
-// note: TOML key `work-runtime` -> accessor `libs.work.runtime`
-
+    implementation(libs.okhttp)
+    implementation(libs.gson)
+    implementation(libs.work.runtime)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
