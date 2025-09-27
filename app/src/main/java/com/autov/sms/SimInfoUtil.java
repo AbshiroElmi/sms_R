@@ -17,13 +17,13 @@ public final class SimInfoUtil {
     private SimInfoUtil() {}
 
     public static class SimInfo {
-        public final String label;            // "Hormuud", "Somtel", etc.
-        public final String operatorName;     // raw carrier name
-        public final String operatorNumeric;  // MCC+MNC (e.g., "637xx")
+        public final String label;
+        public final String operatorName;
+        public final String operatorNumeric;
         public final String mcc;
         public final String mnc;
-        public final String phoneNumber;      // often empty
-        public final String iccid;            // likely null on Android 10+
+        public final String phoneNumber;
+        public final String iccid;
 
         SimInfo(String label, String operatorName, String operatorNumeric,
                 String mcc, String mnc, String phoneNumber, String iccid) {
@@ -49,12 +49,10 @@ public final class SimInfoUtil {
         boolean hasReadPhoneNumbers = hasPerm(ctx, Manifest.permission.READ_PHONE_NUMBERS);
 
         try {
-            // --- Subscription-based info (multi-SIM aware) ---
             SubscriptionInfo si = null;
             try {
                 SubscriptionManager sm = SubscriptionManager.from(ctx);
                 if (sm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                    // On newer Android, accessing SubscriptionInfo fields may require READ_PHONE_STATE
                     if (hasReadPhoneState) {
                         si = sm.getActiveSubscriptionInfo(subId);
                     }
@@ -65,19 +63,16 @@ public final class SimInfoUtil {
                 CharSequence cn = si.getCarrierName();
                 if (cn != null) operatorName = cn.toString();
 
-                // Number from SubscriptionInfo (often empty). May require READ_PHONE_NUMBERS/STATE.
                 try {
-                    String n = si.getNumber(); // deprecated on 33+, may still return
+                    String n = si.getNumber();
                     if (n != null && !n.isEmpty()) phoneNumber = n;
                 } catch (SecurityException ignored) {}
             }
 
-            // --- TelephonyManager (per-sub) ---
             TelephonyManager tm  = (TelephonyManager) ctx.getSystemService(Context.TELEPHONY_SERVICE);
             TelephonyManager tms = (tm != null) ? tm.createForSubscriptionId(subId) : null;
 
             if (tms != null) {
-                // Operator name (raw)
                 try {
                     if (operatorName.isEmpty()) {
                         String opName = tms.getSimOperatorName();
@@ -85,13 +80,11 @@ public final class SimInfoUtil {
                     }
                 } catch (SecurityException ignored) {}
 
-                // MCC+MNC (e.g., "637xx")
                 try {
                     String opNum = tms.getSimOperator();
                     if (opNum != null) operatorNumeric = opNum;
                 } catch (SecurityException ignored) {}
 
-                // Line1 number (very often empty by design)
                 if ((phoneNumber == null || phoneNumber.isEmpty()) && (hasReadPhoneNumbers || hasReadPhoneState)) {
                     try {
                         String line = tms.getLine1Number();
@@ -99,15 +92,13 @@ public final class SimInfoUtil {
                     } catch (SecurityException ignored) {}
                 }
 
-                // ICCID (SIM serial) — typically unavailable on Android 10+ for normal apps
                 if (hasIccidAccess() && hasReadPhoneState) {
                     try {
-                        iccid = tms.getLine1Number(); // likely null
+                        iccid = tms.getLine1Number();
                     } catch (SecurityException ignored) {}
                 }
             }
 
-            // Parse MCC/MNC if we got operatorNumeric (first 3 = MCC, rest = MNC)
             if (operatorNumeric != null && operatorNumeric.length() >= 5) {
                 mcc = operatorNumeric.substring(0, 3);
                 mnc = operatorNumeric.substring(3);
@@ -125,17 +116,14 @@ public final class SimInfoUtil {
                 iccid);
     }
 
-    /** Check a dangerous permission at runtime */
     private static boolean hasPerm(Context ctx, String perm) {
         return ContextCompat.checkSelfPermission(ctx, perm) == PackageManager.PERMISSION_GRANTED;
     }
 
-    /** Realistically false for normal apps on Android 10+. */
     private static boolean hasIccidAccess() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.Q;
     }
 
-    /** Map raw operator to nice Somali labels */
     private static String mapSomaliOperator(String operatorName, String operatorNumeric) {
         String n = (operatorName == null ? "" : operatorName).toLowerCase(Locale.US);
 
@@ -163,7 +151,6 @@ public final class SimInfoUtil {
         return s == null ? "" : s;
     }
 
-    /** Optional: mask a phone number before sending to server */
     public static String maskNumber(@Nullable String number) {
         if (number == null) return "";
         String n = number.replaceAll("\\s+", "");
