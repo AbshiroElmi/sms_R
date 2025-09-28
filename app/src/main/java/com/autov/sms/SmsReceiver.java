@@ -21,6 +21,7 @@ public class SmsReceiver extends BroadcastReceiver {
 
         final PendingResult result = goAsync();
         try {
+            // Opportunistic flush on any broadcast
             QueueUploader.flushQueueIfAnyAsync(context);
 
             JSONObject payload = buildPayload(context, intent);
@@ -59,14 +60,22 @@ public class SmsReceiver extends BroadcastReceiver {
                 if (msg == null) continue;
 
                 if (fromNumber.isEmpty() && msg.getOriginatingAddress() != null) {
-                    fromNumber = msg.getOriginatingAddress(); // raw sender (may be alphanumeric like "Notice")
+                    fromNumber = msg.getOriginatingAddress(); // raw sender (may be "192", "Notice", etc.)
                 }
                 if (msg.getTimestampMillis() > 0) ts = msg.getTimestampMillis();
                 if (msg.getMessageBody() != null) body.append(msg.getMessageBody());
             }
 
+            // Skip OLD messages (before app baseline)
             if (ts < baseline) return null;
 
+            // ✅ ENFORCE WHITELIST FOR NEW SMS
+            if (!WhitelistUtil.isAllowed(context, fromNumber)) {
+                Log.d(TAG, "Sender '" + fromNumber + "' not in whitelist → skip NEW sms.");
+                return null; // don't send or queue
+            }
+
+            // Collect SIM info (best-effort)
             SimInfoUtil.SimInfo si = SimInfoUtil.read(context, subId);
             int simSlot = -1;
             int simIndexHuman = -1;
@@ -86,6 +95,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     // sender
                     .put("from", fromNumber == null ? "" : fromNumber)
                     .put("body", sanitizeBody(body == null ? "" : body.toString()))
+                    // SIM identity
                     .put("sim_id", subId)
                     .put("sim_slot", simSlot)
                     .put("sim_index", simIndexHuman)
@@ -94,10 +104,13 @@ public class SmsReceiver extends BroadcastReceiver {
                     .put("operator_numeric", si.operatorNumeric)
                     .put("mcc", si.mcc)
                     .put("mnc", si.mnc)
+                    // line/ICCID metadata (best-effort)
                     .put("line_number", maskedNumber)
                     .put("iccid_available", si.iccid != null)
+                    // timestamp
                     .put("date", Iso.fromMillis(ts));
 
+            // Advance baseline so we don't resend older than this
             QueueUploader.maybeAdvanceBaseline(context, ts);
 
             return payload;
@@ -109,7 +122,7 @@ public class SmsReceiver extends BroadcastReceiver {
 
     private static String sanitizeBody(String s) {
         if (s == null) return "";
-        s = s.replaceAll("[\\p{Cntrl}&&[^\n\r\t]]", "");
+        s = s.replaceAll("[\\p{Cntrl}&&[^\n\r\t]]", ""); // strip non-printing controls
         s = s.trim();
         final int MAX = 4000;
         return s.length() > MAX ? s.substring(0, MAX) : s;

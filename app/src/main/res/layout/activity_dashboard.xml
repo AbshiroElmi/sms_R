@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootDash"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F8F9FA">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Taller toolbar to comfortably fit spinner with 16dp top margin -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:background="#2973B2"
+            android:title="SMS"
+            android:titleTextColor="@android:color/white"
+            app:titleCentered="true">
+
+            <Spinner
+                android:id="@+id/senderSpinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="12dp"
+                android:popupTheme="@style/ThemeOverlay.Material3.Light"/>
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/centerText"
+                android:layout_gravity="center"
+                android:text="Sending NEW SMS"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:textColor="#212529"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+        </FrameLayout>
+
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

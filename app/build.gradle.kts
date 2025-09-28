@@ -40,6 +40,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.11.0")
     implementation("androidx.work:work-runtime:2.9.1")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation(libs.zxing.embedded)
+    implementation(libs.zxing.core)
+
     implementation(libs.okhttp)
     implementation(libs.gson)
     implementation(libs.work.runtime)
