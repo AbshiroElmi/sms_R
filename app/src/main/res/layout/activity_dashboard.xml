@@ -17,8 +17,10 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="72dp"
-            android:background="#2973B2"
+            android:background="#2973b2"
+            android:paddingTop="18dp"
             android:title="SMS"
+            android:textColor="#212529"
             android:titleTextColor="@android:color/white"
             app:titleCentered="true">
 
@@ -27,8 +29,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="end|center_vertical"
-                android:layout_marginTop="16dp"
                 android:layout_marginEnd="12dp"
+                android:textColor="#5E0808"
                 android:popupTheme="@style/ThemeOverlay.Material3.Light"/>
         </com.google.android.material.appbar.MaterialToolbar>
 

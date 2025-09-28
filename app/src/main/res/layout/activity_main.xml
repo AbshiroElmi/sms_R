@@ -16,7 +16,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="#2973B2"
+            android:background="#2973b2"
             android:title="SMS"
             android:titleTextColor="@android:color/white"
             app:titleCentered="true" />
