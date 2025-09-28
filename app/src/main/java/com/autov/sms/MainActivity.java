@@ -57,9 +57,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        boolean enabled = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE)
+                .getBoolean(Const.PREF_ENABLED, false);
+        if (enabled) {
+            startActivity(new Intent(this, DashboardActivity.class));
+            finish();
+            return;
+        }
         setContentView(R.layout.activity_main);
 
-        // Baseline so we only process NEW sms
         QueueUploader.ensureBaselineNow(this);
 
         bindViews();
