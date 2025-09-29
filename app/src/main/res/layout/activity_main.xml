@@ -188,7 +188,6 @@
         <!-- Status footer -->
         <TextView
             android:id="@+id/status"
-            android:text="✅ Only NEW SMS are sent"
             android:textColor="#212529"
             android:padding="12dp"
             android:layout_width="match_parent"
