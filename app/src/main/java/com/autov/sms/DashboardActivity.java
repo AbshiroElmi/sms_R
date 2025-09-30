@@ -4,17 +4,23 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
+import android.widget.EditText;
 import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+
+import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Set;
 
 public class DashboardActivity extends AppCompatActivity {
 
-    private static final String[] SENDERS = new String[]{"192", "Notice", "Maamuus"};
+    private ChipGroup chips;
+    private EditText etSender;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -23,45 +29,79 @@ public class DashboardActivity extends AppCompatActivity {
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+        }
+        toolbar.setTitle("");
 
-        // Center text already in XML (TextView)
         TextView tv = findViewById(R.id.centerText);
         tv.setText("Sending NEW SMS");
 
-        // Spinner in toolbar (top-right)
-        Spinner spinner = findViewById(R.id.senderSpinner);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_dropdown_item, SENDERS);
-        spinner.setAdapter(adapter);
+        chips = findViewById(R.id.chips);
+        etSender = findViewById(R.id.etSender);
+        MaterialButton btnAdd = findViewById(R.id.btnAdd);
 
-        // Initialize selection from prefs (pick first match if present)
-        // (We store single selection; if none, no sender is allowed)
-        // This snippet sets spinner to the first whitelisted value if found:
-        int idx = -1;
-        for (int i = 0; i < SENDERS.length; i++) {
-            if (WhitelistUtil.getWhitelist(this).contains(SENDERS[i])) {
-                idx = i; break;
-            }
-        }
-        if (idx >= 0) spinner.setSelection(idx);
+        // Load saved whitelist
+        refreshChips();
 
-        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            boolean first = true;
-            @Override public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
-                // Avoid double fire on first attach if you want; harmless if kept
-                String chosen = SENDERS[position];
-                WhitelistUtil.setSingleSender(DashboardActivity.this, chosen);
+        // Add new sender
+        btnAdd.setOnClickListener(v -> {
+            String raw = etSender.getText() == null ? "" : etSender.getText().toString().trim();
+            if (raw.isEmpty()) return;
+
+            // Normalize a little (case-insensitive match)
+            String normalized = normalizeSender(raw);
+
+            Set<String> current = new LinkedHashSet<>(WhitelistUtil.getWhitelist(this));
+            if (!current.contains(normalized)) {
+                current.add(normalized);
+                WhitelistUtil.setWhitelist(this, current);
+                refreshChips();
             }
-            @Override public void onNothingSelected(AdapterView<?> parent) {
-                // Clear whitelist if nothing selected (not typical with Spinner)
-                WhitelistUtil.clear(DashboardActivity.this);
-            }
+            etSender.setText("");
         });
+    }
+
+    private String normalizeSender(String s) {
+        // Keep numbers as-is; make text case-insensitive by lower-casing
+        // (WhitelistUtil will compare exact strings; we store normalized)
+        // You can change rule to your need.
+        boolean allDigits = s.matches("\\d+");
+        return allDigits ? s : s.toLowerCase(Locale.US);
+    }
+
+    private void refreshChips() {
+        chips.removeAllViews();
+        Set<String> list = WhitelistUtil.getWhitelist(this);
+
+        // If empty, show a single “ALL” info chip (not actually saved; just visual hint)
+        if (list.isEmpty()) {
+            Chip ch = new Chip(this, null, com.google.android.material.R.style.Widget_Material3_Chip_Assist_Elevated);
+            ch.setText("ALL senders allowed");
+            ch.setChipIconResource(android.R.drawable.ic_menu_info_details);
+            ch.setCloseIconVisible(false);
+            ch.setEnabled(false);
+            chips.addView(ch);
+            return;
+        }
+
+        for (String entry : list) {
+            Chip ch = new Chip(this, null, com.google.android.material.R.style.Widget_Material3_Chip_Assist_Elevated);
+            ch.setText(entry);
+            ch.setCloseIconVisible(true);
+            ch.setOnCloseIconClickListener(v -> {
+                Set<String> cur = new LinkedHashSet<>(WhitelistUtil.getWhitelist(this));
+                cur.remove(entry);
+                WhitelistUtil.setWhitelist(this, cur);
+                refreshChips();
+            });
+            chips.addView(ch);
+        }
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_dashboard, menu);
+        getMenuInflater().inflate(R.menu.menu_dashboard, menu); // contains Logout
         return true;
     }
 
@@ -77,10 +117,7 @@ public class DashboardActivity extends AppCompatActivity {
     private void doLogout() {
         // Clear prefs + queue and go back to MainActivity
         getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit().clear().apply();
-        // Also clear queue explicitly (optional; already cleared by clear())
-        // WhitelistUtil.clear(this); // redundant after clear()
 
-        // Navigate back to setup
         Intent i = new Intent(this, MainActivity.class);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(i);
