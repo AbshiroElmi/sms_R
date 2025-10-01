@@ -6,6 +6,8 @@ public final class Const {
     public static final String PREF_QUEUE = "offline_queue_v1";
     public static final String PREF_BASELINE_SET = "baseline_set";
     public static final int    QUEUE_MAX = 1000;
+    // Const.java  (add these if not present)
+    public static final String PREF_SEND_ALL   = "send_all";       // NEW (default false)
 
     public static final String PREF_SERVER = "server"; // 1=Autov, 3=Other
     public static final String PREF_ENABLED = "enabled";

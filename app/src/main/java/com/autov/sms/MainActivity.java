@@ -28,7 +28,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
-// ZXing (QR)
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
 
@@ -39,14 +38,13 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout formAutov, formOther;
     private EditText etAutovCode, etOtherUrl;
     private Button btnConnect;
-    private ImageButton btnScanQr; // ← NEW
+    private ImageButton btnScanQr;
     private View progress;
 
     private final OkHttpClient http = new OkHttpClient.Builder().build();
 
     private ActivityResultLauncher<String[]> permsLauncher;
 
-    // QR launcher (lifecycle-safe)
     private final ActivityResultLauncher<ScanOptions> qrLauncher =
             registerForActivityResult(new ScanContract(), result -> {
                 if (result.getContents() != null && etAutovCode != null) {
@@ -60,13 +58,15 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
 
+        // If already configured, go straight to SendAll (the ON/OFF screen)
         boolean enabled = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE)
                 .getBoolean(Const.PREF_ENABLED, false);
         if (enabled) {
-            startActivity(new Intent(this, DashboardActivity.class));
+            startActivity(new Intent(this, SendAllActivity.class));
             finish();
             return;
         }
+
         setContentView(R.layout.activity_main);
 
         QueueUploader.ensureBaselineNow(this);
@@ -76,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
         restoreUiFromPrefs();
         maybeAskIgnoreBatteryOptimizations();
 
-        // Initial opportunistic flush
         QueueUploader.flushQueueIfAny(this);
     }
 
@@ -91,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
         etOtherUrl  = findViewById(R.id.etOtherUrl);
         btnConnect  = findViewById(R.id.btnConnect);
         progress    = findViewById(R.id.progress);
-        btnScanQr   = findViewById(R.id.btnScanQr); // ← NEW (must exist in XML)
+        btnScanQr   = findViewById(R.id.btnScanQr);
 
         rgServers.setOnCheckedChangeListener((g, id) -> {
             formAutov.setVisibility(id == R.id.rbAutov ? View.VISIBLE : View.GONE);
@@ -108,14 +107,14 @@ public class MainActivity extends AppCompatActivity {
     private void initPerms() {
         permsLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(),
-                result -> { /* optional: inspect grants */ });
+                result -> {});
 
         List<String> missing = new ArrayList<>();
         addIfMissing(missing, Manifest.permission.RECEIVE_SMS);
         addIfMissing(missing, Manifest.permission.READ_SMS);
         addIfMissing(missing, Manifest.permission.READ_PHONE_STATE);
         addIfMissing(missing, Manifest.permission.READ_PHONE_NUMBERS);
-        addIfMissing(missing, Manifest.permission.CAMERA); // ← NEW for QR
+        addIfMissing(missing, Manifest.permission.CAMERA);
         if (!missing.isEmpty()) {
             permsLauncher.launch(missing.toArray(new String[0]));
         }
@@ -145,13 +144,12 @@ public class MainActivity extends AppCompatActivity {
         int checkedId = rgServers.getCheckedRadioButtonId();
 
         if (checkedId == R.id.rbAutov) {
-            // --- Autov flow (verify token then enable) ---
             String token = etAutovCode.getText().toString().trim();
             if (token.isEmpty()) {
                 toast("Enter access code");
                 return;
             }
-            verifyAutovToken(token); // will call saveServerChoice(1, token, null, true) on success
+            verifyAutovToken(token); // on success → save & go to SendAll
             return;
         }
 
@@ -166,22 +164,19 @@ public class MainActivity extends AppCompatActivity {
             toast("Connected to Other server");
             QueueUploader.flushQueueIfAnyAsync(this);
 
-            // → Go to dashboard
-            startActivity(new Intent(this, DashboardActivity.class));
+            // Go to SendAll (toggle screen)
+            startActivity(new Intent(this, SendAllActivity.class));
             finish();
             return;
         }
 
-
         if (checkedId == R.id.rbSadar) {
-            // Not implemented; keep disabled
             toast("Sadar server currently under maintenance");
             return;
         }
 
         toast("Select a server first");
     }
-
 
     private void verifyAutovToken(String token) {
         showProgress(true);
@@ -191,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
                 String url = Const.verifyUrl(token);
                 Request req = new Request.Builder().url(url).get().build();
                 try (Response res = http.newCall(req).execute()) {
-                    ok = res.isSuccessful(); // 2xx is success; refine if API returns JSON flags
+                    ok = res.isSuccessful();
                 }
             } catch (IOException ignored) {}
 
@@ -201,6 +196,8 @@ public class MainActivity extends AppCompatActivity {
                 if (finalOk) {
                     saveServerChoice(1, token, null, true);
                     toast("Verified! Connected to Autov");
+                    startActivity(new Intent(this, SendAllActivity.class));
+                    finish();
                 } else {
                     toast("Verification failed");
                 }
@@ -221,13 +218,11 @@ public class MainActivity extends AppCompatActivity {
             getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()
                     .putString(Const.PREF_OTHER_URL, otherUrl).apply();
         }
-
-        // Try to flush queue now that we're configured
         QueueUploader.flushQueueIfAnyAsync(this);
     }
 
     private void showProgress(boolean show) {
-        progress.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (progress != null) progress.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void toast(String s) {
