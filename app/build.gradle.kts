@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -12,8 +15,27 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // --- Load keystore props (from app/keystore.properties) ---
+    val keystoreProps = Properties().apply {
+        val propsFile = file("keystore.properties")
+        if (propsFile.exists()) {
+            FileInputStream(propsFile).use { load(it) }
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            // Only configure if file exists (so debug builds still sync without it)
+            if (keystoreProps.isNotEmpty()) {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -23,8 +45,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
+        // (optional) sign debug with same keystore:
+        // debug { signingConfig = signingConfigs.getByName("release") }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -36,14 +62,11 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
-
-    // Newly added:
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.google.code.gson:gson:2.11.0")
-    implementation("androidx.work:work-runtime:2.9.1")
-// note: TOML key `work-runtime` -> accessor `libs.work.runtime`
-
-
+    implementation(libs.okhttp)
+    implementation(libs.gson)
+    implementation(libs.work.runtime)
+    implementation(libs.zxing.embedded)
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

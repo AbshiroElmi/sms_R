@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,11 +24,15 @@ import java.util.concurrent.Executors;
  * Handles:
  * - Baseline (send only NEW sms after install/open)
  * - Offline queue stored in SharedPreferences (FIFO, capped)
- * - HTTP POST to webhook with headers
+ * - HTTP POST with headers to the active endpoint (Autov / Other)
  * - Async helpers so receivers never block the main thread
  *
  * Requires:
- * - Const.java with ENDPOINT, PREF_NAME, PREF_LAST_SYNCED, PREF_QUEUE, PREF_BASELINE_SET, QUEUE_MAX
+ * - Const.java with:
+ *      PREF_NAME, PREF_LAST_SYNCED, PREF_QUEUE, PREF_BASELINE_SET, QUEUE_MAX,
+ *      PREF_SERVER (1=Autov, 2=Sadar, 3=Other),
+ *      PREF_AUTOV_TOKEN, PREF_OTHER_URL, PREF_ENABLED,
+ *      AUTOV_SMS_UPLOAD (Autov SMS endpoint), verifyUrl(token) (used elsewhere)
  * - Iso.java with Iso.now() / Iso.fromMillis(long) helpers (UTC ISO-8601)
  */
 public class QueueUploader {
@@ -117,15 +123,78 @@ public class QueueUploader {
     }
 
     /* ===========================
+     * Endpoint + headers
+     * =========================== */
+
+    /** Resolve the active endpoint based on saved server choice */
+    private static @Nullable String resolveEndpoint(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE);
+        boolean enabled = sp.getBoolean(Const.PREF_ENABLED, false);
+        if (!enabled) {
+            Log.d(TAG, "Uploader disabled; skipping send.");
+            return null;
+        }
+
+        int server = sp.getInt(Const.PREF_SERVER, 1);
+        if (server == 1) {
+            // Autov server
+            return Const.AUTOV_SMS_UPLOAD;
+        } else if (server == 3) {
+            // Other server (use exact URL from prefs)
+            String url = sp.getString(Const.PREF_OTHER_URL, "");
+            if (url == null || url.trim().isEmpty()) {
+                Log.d(TAG, "Other selected but URL empty; skipping send.");
+                return null;
+            }
+            return url.trim();
+        } else {
+            Log.d(TAG, "Unknown server code: " + server + "; skipping send.");
+            return null;
+        }
+    }
+
+    public static void clearQueue(Context ctx) {
+        saveQueue(ctx, new JSONArray());
+    }
+
+
+    /** Read Autov token if configured */
+    private static @Nullable String getAutovTokenOrNull(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE);
+        int server = sp.getInt(Const.PREF_SERVER, 1);
+        if (server == 1) {
+            String token = sp.getString(Const.PREF_AUTOV_TOKEN, "");
+            return (token == null || token.isEmpty()) ? null : token;
+        }
+        return null;
+    }
+
+    /* ===========================
      * Network: send + flush
      * =========================== */
 
     public static void sendToServer(Context ctx, JSONObject payload, String source) {
         try {
+
+            String from = payload.optString("from", "");
+            if (!WhitelistUtil.isAllowed(ctx, from)) {
+                Log.d(TAG, "Queued/new payload from '" + from + "' blocked by whitelist at send time.");
+                return; // do not POST
+            }
+
             Log.d(TAG, "➡️ sending [" + source + "] "
                     + payload.optString("from") + " | " + payload.optString("body"));
 
-            int code = postJson(Const.ENDPOINT, payload, source, null);
+            String endpoint = resolveEndpoint(ctx);
+            if (endpoint == null || endpoint.isEmpty()) {
+                enqueueOffline(ctx, payload); // keep for later
+                return;
+            }
+            Log.d(TAG, "POST endpoint = " + endpoint);
+
+            String autovToken = getAutovTokenOrNull(ctx); // null for Other
+
+            int code = postJson(endpoint, payload, source, null, autovToken);
 
             if (code >= 200 && code < 300) {
                 Log.d(TAG, "✅ sent [" + source + "] status=" + code);
@@ -146,15 +215,29 @@ public class QueueUploader {
             JSONArray q = loadQueue(ctx);
             if (q.length() == 0) return;
 
+            String endpoint = resolveEndpoint(ctx);
+            if (endpoint == null || endpoint.isEmpty()) {
+                // Not configured; keep queued
+                return;
+            }
+            String autovToken = getAutovTokenOrNull(ctx);
+
             JSONArray remain = new JSONArray();
             for (int i = 0; i < q.length(); i++) {
                 JSONObject item = q.optJSONObject(i);
                 if (item == null) continue;
 
+                String from = item.optString("from", "");
+                if (!WhitelistUtil.isAllowed(ctx, from)) {
+                    // Keep it for later in case user changes selection in Dashboard
+                    remain.put(item);
+                    continue;
+                }
+
                 int code;
                 try {
                     String queuedAt = item.optString("_queuedAt", "");
-                    code = postJson(Const.ENDPOINT, item, "flush", queuedAt);
+                    code = postJson(endpoint, item, "flush", queuedAt, autovToken);
                 } catch (Exception e) {
                     code = -1;
                 }
@@ -174,7 +257,8 @@ public class QueueUploader {
     private static int postJson(String endpoint,
                                 JSONObject body,
                                 String source,
-                                String queuedAtHeaderOrNull) throws Exception {
+                                @Nullable String queuedAtHeaderOrNull,
+                                @Nullable String autovTokenOrNull) throws Exception {
         URL url = new URL(endpoint);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
@@ -186,6 +270,10 @@ public class QueueUploader {
             conn.setRequestProperty("X-Source", source);
             if (queuedAtHeaderOrNull != null) {
                 conn.setRequestProperty("X-Queued-At", queuedAtHeaderOrNull);
+            }
+            if (autovTokenOrNull != null) {
+                // Only for Autov server; change header name if your backend expects a different one
+                conn.setRequestProperty("X-Autov-Token", autovTokenOrNull);
             }
 
             byte[] out = body.toString().getBytes(StandardCharsets.UTF_8);
