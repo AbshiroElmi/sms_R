@@ -1,6 +1,8 @@
 package com.autov.sms;
 
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,10 +20,9 @@ public class SendAllActivity extends AppCompatActivity {
         setContentView(R.layout.activity_send_all);
 
         MaterialToolbar tb = findViewById(R.id.toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-        }
-        tb.setTitle("");
+        tb.setTitle("Autov SMS");
+        tb.setTitleTextColor(Color.WHITE);
+
         setSupportActionBar(tb);
 
         // Default OFF if not set
@@ -29,6 +30,8 @@ public class SendAllActivity extends AppCompatActivity {
                 .getBoolean(Const.PREF_SEND_ALL, false);
 
         MaterialSwitch sw = findViewById(R.id.switchSendAll);
+        sw.setTrackTintList(ColorStateList.valueOf(Color.parseColor("#00B09B")));
+
         sw.setChecked(sendAll);
         sw.setOnCheckedChangeListener((CompoundButton button, boolean isChecked) -> {
             getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()

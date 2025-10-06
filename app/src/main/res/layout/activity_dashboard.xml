@@ -17,7 +17,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="70dp"
-            android:background="#2973B2"
+            android:background="#00B09B"
             android:paddingTop="20dp"
             android:titleTextColor="@android:color/white"
             app:titleCentered="true" />
@@ -79,7 +79,7 @@
                 android:text="Add"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white"
-                android:backgroundTint="#2973B2"
+                android:backgroundTint="#00B09B"
                 app:cornerRadius="12dp"/>
         </LinearLayout>
 

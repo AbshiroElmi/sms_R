@@ -16,7 +16,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="70dp"
-            android:background="#2973B2"
+            android:background="#00B09B"
             android:paddingTop="20dp"
 
             android:titleTextColor="@android:color/white"
@@ -44,6 +44,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
+
                 android:checked="false"/>
         </LinearLayout>
 
