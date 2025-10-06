@@ -55,6 +55,15 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        getWindow().setStatusBarColor(
+                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
+        );
+
+// Keep white icons (not light mode icons)
+        new androidx.core.view.WindowInsetsControllerCompat(
+                getWindow(), getWindow().getDecorView()
+        ).setAppearanceLightStatusBars(false);
+
         super.onCreate(savedInstanceState);
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
 

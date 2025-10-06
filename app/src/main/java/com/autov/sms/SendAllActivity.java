@@ -16,6 +16,14 @@ import com.google.android.material.button.MaterialButton;
 public class SendAllActivity extends AppCompatActivity {
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
+        getWindow().setStatusBarColor(
+                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
+        );
+
+        new androidx.core.view.WindowInsetsControllerCompat(
+                getWindow(), getWindow().getDecorView()
+        ).setAppearanceLightStatusBars(false);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_send_all);
 
