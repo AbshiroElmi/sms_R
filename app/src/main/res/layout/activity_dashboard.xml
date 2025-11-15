@@ -31,7 +31,7 @@
             <TextView
                 android:id="@+id/centerText"
                 android:layout_gravity="center"
-                android:text="Sending NEW SMS"
+                android:text="Allow senders"
                 android:textStyle="bold"
                 android:textSize="18sp"
                 android:textColor="#212529"
