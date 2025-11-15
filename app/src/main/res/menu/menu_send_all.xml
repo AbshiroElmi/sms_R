@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/action_dashboard"
-        android:title="Dashboard"
+        android:title="Allow Senders"
         android:icon="@android:drawable/ic_menu_manage"
         android:showAsAction="always"/>
     <item
