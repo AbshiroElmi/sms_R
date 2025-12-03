@@ -44,7 +44,7 @@ public class DashboardActivity extends AppCompatActivity {
         toolbar.setTitle("");
 
         TextView tv = findViewById(R.id.centerText);
-        tv.setText("Sending NEW SMS");
+        tv.setText("Allow senders");
 
         chips = findViewById(R.id.chips);
         etSender = findViewById(R.id.etSender);
