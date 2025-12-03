@@ -98,9 +98,10 @@ public class SmsReceiver extends BroadcastReceiver {
             } catch (SecurityException ignore) {}
 
             String maskedNumber = SimInfoUtil.maskNumber(si.phoneNumber);
-
+            String deviceId = DeviceIdUtil.get(context);
             JSONObject payload = new JSONObject()
                     .put("type", "incoming_new")
+                    .put("device_unique_id", deviceId)
                     .put("from", fromNumber == null ? "" : fromNumber)
                     .put("body", sanitizeBody(body == null ? "" : body.toString()))
                     .put("sim_id", subId)
