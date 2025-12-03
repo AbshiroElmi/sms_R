@@ -15,8 +15,8 @@
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:background="#2973b2"
+            android:layout_height="45dp"
+            android:background="#00B09B"
             android:titleTextColor="@android:color/white"
             app:titleCentered="true" />
 
@@ -179,7 +179,7 @@
                     android:text="Connect to Server"
                     android:textAllCaps="false"
                     android:layout_marginTop="24dp"
-                    android:backgroundTint="#2973B2"
+                    android:backgroundTint="#00B09B"
                     android:textColor="@android:color/white"/>
             </LinearLayout>
         </ScrollView>

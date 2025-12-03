@@ -24,6 +24,15 @@ public class DashboardActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        getWindow().setStatusBarColor(
+                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
+        );
+
+// Keep white icons (not light mode icons)
+        new androidx.core.view.WindowInsetsControllerCompat(
+                getWindow(), getWindow().getDecorView()
+        ).setAppearanceLightStatusBars(false);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dashboard);
 
@@ -35,7 +44,7 @@ public class DashboardActivity extends AppCompatActivity {
         toolbar.setTitle("");
 
         TextView tv = findViewById(R.id.centerText);
-        tv.setText("Sending NEW SMS");
+        tv.setText("Allow senders");
 
         chips = findViewById(R.id.chips);
         etSender = findViewById(R.id.etSender);

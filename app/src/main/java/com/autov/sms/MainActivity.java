@@ -1,14 +1,19 @@
 package com.autov.sms;
 
+import static android.content.ContentValues.TAG;
+
 import android.Manifest;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 
@@ -24,13 +29,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
-// ZXing (QR)
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
+
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -39,14 +47,13 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout formAutov, formOther;
     private EditText etAutovCode, etOtherUrl;
     private Button btnConnect;
-    private ImageButton btnScanQr; // ← NEW
+    private ImageButton btnScanQr;
     private View progress;
 
     private final OkHttpClient http = new OkHttpClient.Builder().build();
 
     private ActivityResultLauncher<String[]> permsLauncher;
 
-    // QR launcher (lifecycle-safe)
     private final ActivityResultLauncher<ScanOptions> qrLauncher =
             registerForActivityResult(new ScanContract(), result -> {
                 if (result.getContents() != null && etAutovCode != null) {
@@ -57,16 +64,27 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        getWindow().setStatusBarColor(
+                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
+        );
+
+// Keep white icons (not light mode icons)
+        new androidx.core.view.WindowInsetsControllerCompat(
+                getWindow(), getWindow().getDecorView()
+        ).setAppearanceLightStatusBars(false);
+
         super.onCreate(savedInstanceState);
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
 
+        // If already configured, go straight to SendAll (the ON/OFF screen)
         boolean enabled = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE)
                 .getBoolean(Const.PREF_ENABLED, false);
         if (enabled) {
-            startActivity(new Intent(this, DashboardActivity.class));
+            startActivity(new Intent(this, SendAllActivity.class));
             finish();
             return;
         }
+
         setContentView(R.layout.activity_main);
 
         QueueUploader.ensureBaselineNow(this);
@@ -76,7 +94,6 @@ public class MainActivity extends AppCompatActivity {
         restoreUiFromPrefs();
         maybeAskIgnoreBatteryOptimizations();
 
-        // Initial opportunistic flush
         QueueUploader.flushQueueIfAny(this);
     }
 
@@ -91,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
         etOtherUrl  = findViewById(R.id.etOtherUrl);
         btnConnect  = findViewById(R.id.btnConnect);
         progress    = findViewById(R.id.progress);
-        btnScanQr   = findViewById(R.id.btnScanQr); // ← NEW (must exist in XML)
+        btnScanQr   = findViewById(R.id.btnScanQr);
 
         rgServers.setOnCheckedChangeListener((g, id) -> {
             formAutov.setVisibility(id == R.id.rbAutov ? View.VISIBLE : View.GONE);
@@ -108,14 +125,14 @@ public class MainActivity extends AppCompatActivity {
     private void initPerms() {
         permsLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(),
-                result -> { /* optional: inspect grants */ });
+                result -> {});
 
         List<String> missing = new ArrayList<>();
         addIfMissing(missing, Manifest.permission.RECEIVE_SMS);
         addIfMissing(missing, Manifest.permission.READ_SMS);
         addIfMissing(missing, Manifest.permission.READ_PHONE_STATE);
         addIfMissing(missing, Manifest.permission.READ_PHONE_NUMBERS);
-        addIfMissing(missing, Manifest.permission.CAMERA); // ← NEW for QR
+        addIfMissing(missing, Manifest.permission.CAMERA);
         if (!missing.isEmpty()) {
             permsLauncher.launch(missing.toArray(new String[0]));
         }
@@ -145,13 +162,12 @@ public class MainActivity extends AppCompatActivity {
         int checkedId = rgServers.getCheckedRadioButtonId();
 
         if (checkedId == R.id.rbAutov) {
-            // --- Autov flow (verify token then enable) ---
             String token = etAutovCode.getText().toString().trim();
             if (token.isEmpty()) {
                 toast("Enter access code");
                 return;
             }
-            verifyAutovToken(token); // will call saveServerChoice(1, token, null, true) on success
+            verifyAutovToken(token); // on success → save & go to SendAll
             return;
         }
 
@@ -166,46 +182,93 @@ public class MainActivity extends AppCompatActivity {
             toast("Connected to Other server");
             QueueUploader.flushQueueIfAnyAsync(this);
 
-            // → Go to dashboard
-            startActivity(new Intent(this, DashboardActivity.class));
+            // Go to SendAll (toggle screen)
+            startActivity(new Intent(this, SendAllActivity.class));
             finish();
             return;
         }
 
-
         if (checkedId == R.id.rbSadar) {
-            // Not implemented; keep disabled
             toast("Sadar server currently under maintenance");
             return;
         }
 
         toast("Select a server first");
     }
-
-
     private void verifyAutovToken(String token) {
         showProgress(true);
+
         Executors.newSingleThreadExecutor().execute(() -> {
-            boolean ok = false;
             try {
                 String url = Const.verifyUrl(token);
-                Request req = new Request.Builder().url(url).get().build();
-                try (Response res = http.newCall(req).execute()) {
-                    ok = res.isSuccessful(); // 2xx is success; refine if API returns JSON flags
-                }
-            } catch (IOException ignored) {}
+                Log.e(TAG, url);
 
-            boolean finalOk = ok;
-            runOnUiThread(() -> {
-                showProgress(false);
-                if (finalOk) {
-                    saveServerChoice(1, token, null, true);
-                    toast("Verified! Connected to Autov");
-                } else {
-                    toast("Verification failed");
+                // Prepare JSON body
+                JSONObject bodyJson = new JSONObject();
+                bodyJson.put("token", token);
+                String uniqueId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+                bodyJson.put("mobile_address", uniqueId);
+
+                RequestBody body = RequestBody.create(
+                        bodyJson.toString(),
+                        MediaType.parse("application/json; charset=utf-8")
+                );
+
+                Request req = new Request.Builder()
+                        .url(url)
+                        .post(body) 
+                        .build();
+
+                try (Response res = http.newCall(req).execute()) {
+                    if (res.body() == null) throw new IOException("Empty response");
+                    String resJson = res.body().string();
+                    Log.e("AutoVSSSS", resJson);
+
+                    JSONObject json = new JSONObject(resJson);
+                    JSONObject messageObj = json.optJSONObject("message");
+                    int status = messageObj != null ? messageObj.optInt("status", 0) : 0;
+                    String serverMsg = messageObj != null ? messageObj.optString("message", "No message") : "No message";
+
+                    boolean ok = status == 1;
+
+                    if (ok) {
+                        Intent intent = new Intent(this, SendAllActivity.class);
+                        intent.putExtra("token", token);
+                        intent.putExtra("mobile_address", uniqueId);
+                        intent.putExtra("batteryLevel", getBatteryLevel());
+
+                        runOnUiThread(() -> {
+                            showProgress(false);
+                            saveServerChoice(1, token, null, true);
+                            toast("Verified! Connected to Autov");
+                            startActivity(intent);
+                            finish();
+                        });
+                    } else {
+                        runOnUiThread(() -> {
+                            showProgress(false);
+                            toast("Verification failed: " + serverMsg);
+                        });
+                    }
                 }
-            });
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    showProgress(false);
+                    toast("Verification failed: " + e.getMessage());
+                });
+            }
         });
+    }
+
+
+    private int getBatteryLevel() {
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, ifilter);
+        int level = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) : -1;
+        int scale = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1) : -1;
+        if (level == -1 || scale == -1) return 50;
+        return (int) ((level / (float) scale) * 100);
     }
 
     private void saveServerChoice(int server, @Nullable String token, @Nullable String otherUrl, boolean enabled) {
@@ -221,13 +284,11 @@ public class MainActivity extends AppCompatActivity {
             getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()
                     .putString(Const.PREF_OTHER_URL, otherUrl).apply();
         }
-
-        // Try to flush queue now that we're configured
         QueueUploader.flushQueueIfAnyAsync(this);
     }
 
     private void showProgress(boolean show) {
-        progress.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (progress != null) progress.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void toast(String s) {
