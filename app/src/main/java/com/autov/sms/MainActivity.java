@@ -1,14 +1,19 @@
 package com.autov.sms;
 
+import static android.content.ContentValues.TAG;
+
 import android.Manifest;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 
@@ -24,12 +29,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
+
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -186,32 +195,80 @@ public class MainActivity extends AppCompatActivity {
 
         toast("Select a server first");
     }
-
     private void verifyAutovToken(String token) {
         showProgress(true);
+
         Executors.newSingleThreadExecutor().execute(() -> {
-            boolean ok = false;
             try {
                 String url = Const.verifyUrl(token);
-                Request req = new Request.Builder().url(url).get().build();
-                try (Response res = http.newCall(req).execute()) {
-                    ok = res.isSuccessful();
-                }
-            } catch (IOException ignored) {}
+                Log.e(TAG, url);
 
-            boolean finalOk = ok;
-            runOnUiThread(() -> {
-                showProgress(false);
-                if (finalOk) {
-                    saveServerChoice(1, token, null, true);
-                    toast("Verified! Connected to Autov");
-                    startActivity(new Intent(this, SendAllActivity.class));
-                    finish();
-                } else {
-                    toast("Verification failed");
+                // Prepare JSON body
+                JSONObject bodyJson = new JSONObject();
+                bodyJson.put("token", token);
+                String uniqueId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+                bodyJson.put("mobile_address", uniqueId);
+
+                RequestBody body = RequestBody.create(
+                        bodyJson.toString(),
+                        MediaType.parse("application/json; charset=utf-8")
+                );
+
+                Request req = new Request.Builder()
+                        .url(url)
+                        .post(body) 
+                        .build();
+
+                try (Response res = http.newCall(req).execute()) {
+                    if (res.body() == null) throw new IOException("Empty response");
+                    String resJson = res.body().string();
+                    Log.e("AutoVSSSS", resJson);
+
+                    JSONObject json = new JSONObject(resJson);
+                    JSONObject messageObj = json.optJSONObject("message");
+                    int status = messageObj != null ? messageObj.optInt("status", 0) : 0;
+                    String serverMsg = messageObj != null ? messageObj.optString("message", "No message") : "No message";
+
+                    boolean ok = status == 1;
+
+                    if (ok) {
+                        Intent intent = new Intent(this, SendAllActivity.class);
+                        intent.putExtra("token", token);
+                        intent.putExtra("mobile_address", uniqueId);
+                        intent.putExtra("batteryLevel", getBatteryLevel());
+
+                        runOnUiThread(() -> {
+                            showProgress(false);
+                            saveServerChoice(1, token, null, true);
+                            toast("Verified! Connected to Autov");
+                            startActivity(intent);
+                            finish();
+                        });
+                    } else {
+                        runOnUiThread(() -> {
+                            showProgress(false);
+                            toast("Verification failed: " + serverMsg);
+                        });
+                    }
                 }
-            });
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    showProgress(false);
+                    toast("Verification failed: " + e.getMessage());
+                });
+            }
         });
+    }
+
+
+    private int getBatteryLevel() {
+        IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent batteryStatus = registerReceiver(null, ifilter);
+        int level = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) : -1;
+        int scale = batteryStatus != null ? batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1) : -1;
+        if (level == -1 || scale == -1) return 50;
+        return (int) ((level / (float) scale) * 100);
     }
 
     private void saveServerChoice(int server, @Nullable String token, @Nullable String otherUrl, boolean enabled) {
