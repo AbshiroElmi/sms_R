@@ -69,29 +69,29 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content">
 
-                            <RadioButton
-                                android:id="@+id/rbAutov"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="Autov Server"
-                                android:padding="12dp"/>
+<!--                            <RadioButton-->
+<!--                                android:id="@+id/rbAutov"-->
+<!--                                android:layout_width="match_parent"-->
+<!--                                android:layout_height="wrap_content"-->
+<!--                                android:text="Autov Server"-->
+<!--                                android:padding="12dp"/>-->
 
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="1dp"
-                                android:background="#FFE6E6E6"/>
+<!--                            <View-->
+<!--                                android:layout_width="match_parent"-->
+<!--                                android:layout_height="1dp"-->
+<!--                                android:background="#FFE6E6E6"/>-->
 
-                            <RadioButton
-                                android:id="@+id/rbSadar"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="Sadar Server"
-                                android:padding="12dp"/>
+<!--                            <RadioButton-->
+<!--                                android:id="@+id/rbSadar"-->
+<!--                                android:layout_width="match_parent"-->
+<!--                                android:layout_height="wrap_content"-->
+<!--                                android:text="Sadar Server"-->
+<!--                                android:padding="12dp"/>-->
 
-                            <View
-                                android:layout_width="match_parent"
-                                android:layout_height="1dp"
-                                android:background="#FFE6E6E6"/>
+<!--                            <View-->
+<!--                                android:layout_width="match_parent"-->
+<!--                                android:layout_height="1dp"-->
+<!--                                android:background="#FFE6E6E6"/>-->
 
                             <RadioButton
                                 android:id="@+id/rbOther"

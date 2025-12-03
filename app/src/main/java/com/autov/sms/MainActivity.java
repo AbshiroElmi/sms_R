@@ -99,8 +99,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void bindViews() {
         rgServers   = findViewById(R.id.rgServers);
-        rbAutov     = findViewById(R.id.rbAutov);
-        rbSadar     = findViewById(R.id.rbSadar);
+//        rbAutov     = findViewById(R.id.rbAutov);
+//        rbSadar     = findViewById(R.id.rbSadar);
         rbOther     = findViewById(R.id.rbOther);
         formAutov   = findViewById(R.id.formAutov);
         formOther   = findViewById(R.id.formOther);
@@ -111,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
         btnScanQr   = findViewById(R.id.btnScanQr);
 
         rgServers.setOnCheckedChangeListener((g, id) -> {
-            formAutov.setVisibility(id == R.id.rbAutov ? View.VISIBLE : View.GONE);
+//            formAutov.setVisibility(id == R.id.rbAutov ? View.VISIBLE : View.GONE);
             formOther.setVisibility(id == R.id.rbOther ? View.VISIBLE : View.GONE);
         });
 
@@ -160,16 +160,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void onConnectClicked() {
         int checkedId = rgServers.getCheckedRadioButtonId();
-
-        if (checkedId == R.id.rbAutov) {
-            String token = etAutovCode.getText().toString().trim();
-            if (token.isEmpty()) {
-                toast("Enter access code");
-                return;
-            }
-            verifyAutovToken(token); // on success → save & go to SendAll
-            return;
-        }
+//
+//        if (checkedId == R.id.rbAutov) {
+//            String token = etAutovCode.getText().toString().trim();
+//            if (token.isEmpty()) {
+//                toast("Enter access code");
+//                return;
+//            }
+//            verifyAutovToken(token); // on success → save & go to SendAll
+//            return;
+//        }
 
         if (checkedId == R.id.rbOther) {
             String url = etOtherUrl.getText().toString().trim();
@@ -188,10 +188,10 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (checkedId == R.id.rbSadar) {
-            toast("Sadar server currently under maintenance");
-            return;
-        }
+//        if (checkedId == R.id.rbSadar) {
+//            toast("Sadar server currently under maintenance");
+//            return;
+//        }
 
         toast("Select a server first");
     }

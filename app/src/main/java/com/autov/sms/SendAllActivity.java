@@ -28,7 +28,7 @@ public class SendAllActivity extends AppCompatActivity {
         setContentView(R.layout.activity_send_all);
 
         MaterialToolbar tb = findViewById(R.id.toolbar);
-        tb.setTitle("Autov SMS");
+//        tb.setTitle("Autov SMS");
         tb.setTitleTextColor(Color.WHITE);
 
         setSupportActionBar(tb);
