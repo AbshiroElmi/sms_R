@@ -32,7 +32,7 @@
 
             <TextView
                 android:id="@+id/title"
-                android:text="Sending Autov SMS"
+                android:text="Sending Sarif SMS"
                 android:textStyle="bold"
                 android:textSize="20sp"
                 android:textColor="#212529"

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.autov.sms">
+>
 
     <!-- Permissions -->
     <uses-feature
@@ -21,7 +21,7 @@
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS"/>
 
     <application
-        android:label="ReadSms"
+        android:label="Sarif SMS"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
