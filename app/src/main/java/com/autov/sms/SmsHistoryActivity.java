@@ -103,7 +103,9 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                         cursor.getLong(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_TIMESTAMP)),
                         cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_STATUS)),
                         cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_SIM_ID)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_ISO_DATE))
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_ISO_DATE)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_RESPONSE)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_URL))
                 ));
             }
             cursor.close();
@@ -136,6 +138,35 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    @Override
+    public void onDetailClick(SmsAdapter.SmsRecord record) {
+        String url = record.url;
+        String resp = record.response;
+
+        // If URL is missing (old records), show the CURRENT configured URL
+        if (url == null || url.isEmpty()) {
+            android.content.SharedPreferences sp = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE);
+            int server = sp.getInt(Const.PREF_SERVER, 1);
+            if (server == 1) {
+                url = Const.AUTOV_SMS_UPLOAD + " ";
+            } else if (server == 3) {
+                url = sp.getString(Const.PREF_OTHER_URL, "") + " ";
+            } else {
+                url = "Unknown";
+            }
+        }
+        if (resp == null || resp.isEmpty()) resp = "No response data";
+
+        // Simple formatting
+        String msg = "URL:\n" + url + "\n\nResponse:\n" + resp;
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Server Details")
+                .setMessage(msg)
+                .setPositiveButton("OK", null)
+                .show();
     }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {

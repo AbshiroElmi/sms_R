@@ -194,19 +194,20 @@ public class QueueUploader {
 
             String autovToken = getAutovTokenOrNull(ctx); // null for Other
 
-            int code = postJson(endpoint, payload, source, null, autovToken);
+            ResponseData res = postJson(endpoint, payload, source, null, autovToken);
 
-            if (code >= 200 && code < 300) {
-                Log.d(TAG, "✅ sent [" + source + "] status=" + code);
-                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT);
+            if (res.code >= 200 && res.code < 300) {
+                Log.d(TAG, "✅ sent [" + source + "] status=" + res.code);
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
             } else {
-                Log.d(TAG, "❌ server status=" + code + " → queue");
-                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED);
+                Log.d(TAG, "❌ server status=" + res.code + " → queue");
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
                 enqueueOffline(ctx, payload);
             }
         } catch (Exception e) {
+            String endpoint = resolveEndpoint(ctx); // Might be null or throw, best effort
             Log.d(TAG, "❌ network error: " + e + " → queue");
-            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED);
+            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, "Exception: " + e.getMessage(), endpoint);
             enqueueOffline(ctx, payload);
         }
     }
@@ -237,20 +238,20 @@ public class QueueUploader {
                     continue;
                 }
 
-                int code;
+                ResponseData res;
                 try {
                     String queuedAt = item.optString("_queuedAt", "");
-                    code = postJson(endpoint, item, "flush", queuedAt, autovToken);
+                    res = postJson(endpoint, item, "flush", queuedAt, autovToken);
                 } catch (Exception e) {
-                    code = -1;
+                    res = new ResponseData(-1, "Exception: " + e.getMessage());
                 }
 
-                if (code < 200 || code >= 300) {
+                if (res.code < 200 || res.code >= 300) {
                     // keep it for future retry
-                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED);
+                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
                     remain.put(item);
                 } else {
-                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT);
+                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
                 }
             }
             saveQueue(ctx, remain);
@@ -260,7 +261,7 @@ public class QueueUploader {
     }
 
     /** Low-level HTTP POST using HttpURLConnection */
-    private static int postJson(String endpoint,
+    private static ResponseData postJson(String endpoint,
                                 JSONObject body,
                                 String source,
                                 @Nullable String queuedAtHeaderOrNull,
@@ -290,25 +291,32 @@ public class QueueUploader {
 
             int code = conn.getResponseCode();
 
-            // Optional: read response for debugging
+            String respBody = "";
             try (BufferedReader br = new BufferedReader(new InputStreamReader(
                     (code >= 200 && code < 300) ? conn.getInputStream() : conn.getErrorStream(),
                     StandardCharsets.UTF_8))) {
-                String line;
                 StringBuilder sb = new StringBuilder();
+                String line;
                 while ((line = br.readLine()) != null) sb.append(line);
-                Log.d(TAG, "HTTP resp (" + code + "): " + sb);
+                respBody = sb.toString();
+                Log.d(TAG, "HTTP resp (" + code + "): " + respBody);
             } catch (Exception ignore) {}
 
-            return code;
+            return new ResponseData(code, respBody);
         } finally {
             conn.disconnect();
         }
     }
-    private static void updateDbStatus(Context ctx, JSONObject payload, int status) {
+    private static void updateDbStatus(Context ctx, JSONObject payload, int status, @Nullable String response, @Nullable String url) {
         long dbId = payload.optLong("_db_id", -1);
         if (dbId != -1) {
-            SmsDatabaseHelper.getInstance(ctx).updateStatus(dbId, status);
+            SmsDatabaseHelper.getInstance(ctx).updateStatusResponseAndUrl(dbId, status, response, url);
         }
+    }
+
+    private static class ResponseData {
+        int code;
+        String body;
+        ResponseData(int code, String body) { this.code = code; this.body = body; }
     }
 }

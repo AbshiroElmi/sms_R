@@ -19,6 +19,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
 
     public interface OnResendClickListener {
         void onResendClick(SmsRecord record);
+        void onDetailClick(SmsRecord record);
     }
 
     private List<SmsRecord> items = new ArrayList<>();
@@ -48,22 +49,49 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
         holder.tvTime.setText(record.isoDate);
 
         if (record.status == SmsDatabaseHelper.STATUS_SENT) {
-            holder.tvStatus.setText("SENT");
+            holder.tvStatus.setText("SENT"); // No extra text
             holder.tvStatus.setBackgroundColor(Color.parseColor("#4CAF50"));
+            holder.tvStatus.setClickable(false); // Text badge static
+            holder.tvStatus.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0); // No inline arrow
+            holder.ivDropdown.setVisibility(View.VISIBLE);
+            holder.ivDropdown.setOnClickListener(v -> showStatusMenu(v, record));
             holder.btnResend.setVisibility(View.GONE);
         } else if (record.status == SmsDatabaseHelper.STATUS_PENDING) {
             holder.tvStatus.setText("PENDING");
             holder.tvStatus.setBackgroundColor(Color.parseColor("#FF9800"));
+            holder.tvStatus.setClickable(false);
+            holder.tvStatus.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
+            holder.ivDropdown.setVisibility(View.GONE);
+            holder.ivDropdown.setOnClickListener(null);
             holder.btnResend.setVisibility(View.VISIBLE);
         } else {
             holder.tvStatus.setText("FAILED");
             holder.tvStatus.setBackgroundColor(Color.parseColor("#F44336"));
+            holder.tvStatus.setClickable(false);
+            holder.tvStatus.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
+            holder.ivDropdown.setVisibility(View.VISIBLE);
+            holder.ivDropdown.setOnClickListener(v -> showStatusMenu(v, record));
             holder.btnResend.setVisibility(View.VISIBLE);
         }
 
         holder.btnResend.setOnClickListener(v -> {
             if (listener != null) listener.onResendClick(record);
         });
+    }
+
+    private void showStatusMenu(View v, SmsRecord record) {
+        android.widget.PopupMenu popup = new android.widget.PopupMenu(v.getContext(), v);
+        popup.getMenu().add("Detail");
+        popup.getMenu().add("Resend");
+        popup.setOnMenuItemClickListener(item -> {
+            if (item.getTitle().equals("Detail")) {
+                if (listener != null) listener.onDetailClick(record);
+            } else if (item.getTitle().equals("Resend")) {
+                if (listener != null) listener.onResendClick(record);
+            }
+            return true;
+        });
+        popup.show();
     }
 
     @Override
@@ -73,6 +101,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView tvFrom, tvBody, tvStatus, tvTime;
+        android.widget.ImageView ivDropdown;
         MaterialButton btnResend;
 
         public ViewHolder(@NonNull View itemView) {
@@ -80,6 +109,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
             tvFrom = itemView.findViewById(R.id.tvFrom);
             tvBody = itemView.findViewById(R.id.tvBody);
             tvStatus = itemView.findViewById(R.id.tvStatus);
+            ivDropdown = itemView.findViewById(R.id.ivDropdown);
             tvTime = itemView.findViewById(R.id.tvTime);
             btnResend = itemView.findViewById(R.id.btnResend);
         }
@@ -93,8 +123,10 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
         int status;
         int simId;
         String isoDate;
+        String response;
+        String url;
 
-        public SmsRecord(long id, String from, String body, long timestamp, int status, int simId, String isoDate) {
+        public SmsRecord(long id, String from, String body, long timestamp, int status, int simId, String isoDate, String response, String url) {
             this.id = id;
             this.from = from;
             this.body = body;
@@ -102,6 +134,8 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
             this.status = status;
             this.simId = simId;
             this.isoDate = isoDate;
+            this.response = response;
+            this.url = url;
         }
     }
 }
