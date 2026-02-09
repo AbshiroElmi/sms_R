@@ -198,12 +198,15 @@ public class QueueUploader {
 
             if (code >= 200 && code < 300) {
                 Log.d(TAG, "✅ sent [" + source + "] status=" + code);
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT);
             } else {
                 Log.d(TAG, "❌ server status=" + code + " → queue");
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED);
                 enqueueOffline(ctx, payload);
             }
         } catch (Exception e) {
             Log.d(TAG, "❌ network error: " + e + " → queue");
+            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED);
             enqueueOffline(ctx, payload);
         }
     }
@@ -244,7 +247,10 @@ public class QueueUploader {
 
                 if (code < 200 || code >= 300) {
                     // keep it for future retry
+                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED);
                     remain.put(item);
+                } else {
+                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT);
                 }
             }
             saveQueue(ctx, remain);
@@ -297,6 +303,12 @@ public class QueueUploader {
             return code;
         } finally {
             conn.disconnect();
+        }
+    }
+    private static void updateDbStatus(Context ctx, JSONObject payload, int status) {
+        long dbId = payload.optLong("_db_id", -1);
+        if (dbId != -1) {
+            SmsDatabaseHelper.getInstance(ctx).updateStatus(dbId, status);
         }
     }
 }

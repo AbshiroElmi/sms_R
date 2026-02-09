@@ -24,7 +24,6 @@ public class SmsReceiver extends BroadcastReceiver {
             QueueUploader.flushQueueIfAnyAsync(context);
 
             JSONObject payload = buildPayload(context, intent);
-
             if (payload != null && payload.has("type")) {
                 QueueUploader.sendToServerAsync(context, payload, "background-new");
                 QueueUploader.flushQueueIfAnyAsync(context);
@@ -117,6 +116,18 @@ public class SmsReceiver extends BroadcastReceiver {
                     .put("date", Iso.fromMillis(ts));
 
             QueueUploader.maybeAdvanceBaseline(context, ts);
+
+            // Save to History Database before return
+            long dbId = SmsDatabaseHelper.getInstance(context).insertSms(
+                    fromNumber == null ? "" : fromNumber,
+                    sanitizeBody(body == null ? "" : body.toString()),
+                    ts,
+                    SmsDatabaseHelper.STATUS_PENDING,
+                    subId,
+                    Iso.fromMillis(ts)
+            );
+            payload.put("_db_id", dbId);
+
             return payload;
         } catch (Exception e) {
             Log.e(TAG, "buildPayload error", e);

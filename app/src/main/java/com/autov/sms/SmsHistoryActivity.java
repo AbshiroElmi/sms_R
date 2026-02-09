@@ -1,0 +1,136 @@
+package com.autov.sms;
+
+import android.database.Cursor;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.datepicker.MaterialDatePicker;
+
+import org.json.JSONObject;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.OnResendClickListener {
+
+    private RecyclerView recyclerView;
+    private SmsAdapter adapter;
+    private TextView tvDateFilter;
+    private MaterialButton btnClearFilter;
+    private String currentDateFilter = null;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        getWindow().setStatusBarColor(
+                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
+        );
+        new androidx.core.view.WindowInsetsControllerCompat(
+                getWindow(), getWindow().getDecorView()
+        ).setAppearanceLightStatusBars(false);
+
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_sms_history);
+
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toolbar.setNavigationOnClickListener(v -> finish());
+
+        recyclerView = findViewById(R.id.recyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new SmsAdapter(this);
+        recyclerView.setAdapter(adapter);
+
+        tvDateFilter = findViewById(R.id.tvDateFilter);
+        btnClearFilter = findViewById(R.id.btnClearFilter);
+
+        findViewById(R.id.btnPickDate).setOnClickListener(v -> showDatePicker());
+        btnClearFilter.setOnClickListener(v -> {
+            currentDateFilter = null;
+            tvDateFilter.setText("All Dates");
+            btnClearFilter.setVisibility(View.GONE);
+            loadData();
+        });
+
+        loadData();
+    }
+
+    private void showDatePicker() {
+        MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                .setTitleText("Select Date")
+                .setSelection(MaterialDatePicker.todayInUtcMilliseconds())
+                .build();
+
+        datePicker.addOnPositiveButtonClickListener(selection -> {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+            currentDateFilter = sdf.format(new Date(selection));
+            tvDateFilter.setText("Date: " + currentDateFilter);
+            btnClearFilter.setVisibility(View.VISIBLE);
+            loadData();
+        });
+
+        datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
+    }
+
+    private void loadData() {
+        List<SmsAdapter.SmsRecord> records = new ArrayList<>();
+        Cursor cursor = SmsDatabaseHelper.getInstance(this).getAllSmsCursor(currentDateFilter);
+        
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                records.add(new SmsAdapter.SmsRecord(
+                        cursor.getLong(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_ID)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_FROM)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_BODY)),
+                        cursor.getLong(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_TIMESTAMP)),
+                        cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_STATUS)),
+                        cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_SIM_ID)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_ISO_DATE))
+                ));
+            }
+            cursor.close();
+        }
+        adapter.setItems(records);
+    }
+
+    @Override
+    public void onResendClick(SmsAdapter.SmsRecord record) {
+        try {
+            String deviceId = DeviceIdUtil.get(this);
+            SimInfoUtil.SimInfo si = SimInfoUtil.read(this, record.simId);
+            String maskedNumber = SimInfoUtil.maskNumber(si.phoneNumber);
+
+            JSONObject payload = new JSONObject()
+                    .put("type", "incoming_resend")
+                    .put("device_unique_id", deviceId)
+                    .put("from", record.from)
+                    .put("body", record.body)
+                    .put("sim_id", record.simId)
+                    .put("line_number", maskedNumber)
+                    .put("date", record.isoDate)
+                    .put("_db_id", record.id);
+
+            QueueUploader.sendToServerAsync(this, payload, "resend-manual");
+            Toast.makeText(this, "Resending...", Toast.LENGTH_SHORT).show();
+            
+            // Refresh UI in a bit
+            recyclerView.postDelayed(this::loadData, 2000);
+        } catch (Exception e) {
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+}

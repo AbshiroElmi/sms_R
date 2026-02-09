@@ -57,7 +57,10 @@ public class SendAllActivity extends AppCompatActivity {
 
     @Override public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_dashboard) {
+        if (id == R.id.action_history) {
+            startActivity(new Intent(this, SmsHistoryActivity.class));
+            return true;
+        } else if (id == R.id.action_dashboard) {
             startActivity(new Intent(this, DashboardActivity.class));
             return true;
         } else if (id == R.id.action_logout) {
