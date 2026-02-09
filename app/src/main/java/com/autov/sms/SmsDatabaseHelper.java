@@ -87,4 +87,8 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         }
         return db.query(TABLE_SMS, null, selection, selectionArgs, null, null, COLUMN_TIMESTAMP + " DESC");
     }
+    public void deleteAllSms() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete(TABLE_SMS, null, null);
+    }
 }

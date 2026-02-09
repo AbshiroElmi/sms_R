@@ -17,6 +17,10 @@ import com.google.android.material.datepicker.MaterialDatePicker;
 
 import org.json.JSONObject;
 
+import android.view.Menu;
+import android.view.MenuItem;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -132,5 +136,32 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_sms_history, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_clear_history) {
+            showClearHistoryDialog();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void showClearHistoryDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Clear History")
+                .setMessage("Are you sure you want to delete all SMS history?")
+                .setPositiveButton("Clear All", (dialog, which) -> {
+                    SmsDatabaseHelper.getInstance(this).deleteAllSms();
+                    loadData(); // Refresh the list
+                    Toast.makeText(this, "History cleared", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 }
