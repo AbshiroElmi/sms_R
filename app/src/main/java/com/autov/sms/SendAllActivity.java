@@ -63,6 +63,16 @@ public class SendAllActivity extends AppCompatActivity {
         } else if (id == R.id.action_dashboard) {
             startActivity(new Intent(this, DashboardActivity.class));
             return true;
+        } else if (id == R.id.action_switch) {
+            // Only disable "enabled" flag so MainActivity doesn't auto-redirect
+            getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()
+                    .putBoolean(Const.PREF_ENABLED, false)
+                    .apply();
+            Intent i = new Intent(this, MainActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(i);
+            finish();
+            return true;
         } else if (id == R.id.action_logout) {
             // Clear everything and go to MainActivity
             getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit().clear().apply();

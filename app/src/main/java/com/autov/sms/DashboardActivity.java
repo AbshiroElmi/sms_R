@@ -119,8 +119,24 @@ public class DashboardActivity extends AppCompatActivity {
         if (item.getItemId() == R.id.action_logout) {
             doLogout();
             return true;
+        } else if (item.getItemId() == R.id.action_switch) {
+            doSwitch();
+            return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void doSwitch() {
+        // Only disable "enabled" flag so MainActivity doesn't auto-redirect,
+        // but keep all other prefs (token, whitelist, etc.) intact.
+        getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()
+                .putBoolean(Const.PREF_ENABLED, false)
+                .apply();
+
+        Intent i = new Intent(this, MainActivity.class);
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(i);
+        finish();
     }
 
     private void doLogout() {

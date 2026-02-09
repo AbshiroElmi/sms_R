@@ -11,6 +11,11 @@
         android:icon="@android:drawable/ic_menu_manage"
         android:showAsAction="always"/>
     <item
+        android:id="@+id/action_switch"
+        android:title="Switch"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:showAsAction="ifRoom"/>
+    <item
         android:id="@+id/action_logout"
         android:title="Logout"
         android:icon="@android:drawable/ic_lock_power_off"
