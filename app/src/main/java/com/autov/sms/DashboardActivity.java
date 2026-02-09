@@ -1,34 +1,62 @@
 package com.autov.sms;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
-import android.widget.TextView;
+import android.widget.RadioGroup;
+import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.appbar.MaterialToolbar;
-import com.google.android.material.button.MaterialButton;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.journeyapps.barcodescanner.ScanContract;
+import com.journeyapps.barcodescanner.ScanOptions;
+import java.util.ArrayList;
+import java.util.List;
 
-import java.util.LinkedHashSet;
-import java.util.Locale;
-import java.util.Set;
+public class DashboardActivity extends AppCompatActivity implements ConfigAdapter.OnConfigChangeListener {
 
-public class DashboardActivity extends AppCompatActivity {
+    private RecyclerView rvConfigs;
+    private ConfigAdapter adapter;
+    private View emptyState;
+    private FloatingActionButton fabAdd;
+    private SmsDatabaseHelper dbHelper;
+    private ActivityResultLauncher<String[]> permsLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            result -> {});
 
-    private ChipGroup chips;
-    private EditText etSender;
+    private EditText activeEditText; // For QR scan result
+    private SmsDatabaseHelper.Config currentEditing = null;
+
+    private final ActivityResultLauncher<ScanOptions> qrLauncher =
+            registerForActivityResult(new ScanContract(), result -> {
+                if (result.getContents() != null && activeEditText != null) {
+                    activeEditText.setText(result.getContents().trim());
+                    Toast.makeText(this, "QR scanned", Toast.LENGTH_SHORT).show();
+                }
+            });
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         getWindow().setStatusBarColor(
                 androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
         );
-
-// Keep white icons (not light mode icons)
         new androidx.core.view.WindowInsetsControllerCompat(
                 getWindow(), getWindow().getDecorView()
         ).setAppearanceLightStatusBars(false);
@@ -36,116 +64,256 @@ public class DashboardActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_dashboard);
 
+        dbHelper = SmsDatabaseHelper.getInstance(this);
+
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayShowTitleEnabled(false);
-        }
-        toolbar.setTitle("");
 
-        TextView tv = findViewById(R.id.centerText);
-        tv.setText("Allow senders");
+        rvConfigs = findViewById(R.id.rvConfigs);
+        emptyState = findViewById(R.id.emptyState);
+        fabAdd = findViewById(R.id.fabAddConfig);
+        
+        rvConfigs.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new ConfigAdapter(this);
+        rvConfigs.setAdapter(adapter);
 
-        chips = findViewById(R.id.chips);
-        etSender = findViewById(R.id.etSender);
-        MaterialButton btnAdd = findViewById(R.id.btnAdd);
-
-        // Load saved whitelist
-        refreshChips();
-
-        // Add new sender
-        btnAdd.setOnClickListener(v -> {
-            String raw = etSender.getText() == null ? "" : etSender.getText().toString().trim();
-            if (raw.isEmpty()) return;
-
-            // Normalize a little (case-insensitive match)
-            String normalized = normalizeSender(raw);
-
-            Set<String> current = new LinkedHashSet<>(WhitelistUtil.getWhitelist(this));
-            if (!current.contains(normalized)) {
-                current.add(normalized);
-                WhitelistUtil.setWhitelist(this, current);
-                refreshChips();
-            }
-            etSender.setText("");
+        findViewById(R.id.btnCreateConfig).setOnClickListener(v -> {
+            currentEditing = null;
+            showStep1Title();
         });
+        fabAdd.setOnClickListener(v -> {
+            currentEditing = null;
+            showStep1Title();
+        });
+
+        QueueUploader.ensureBaselineNow(this);
+        initPerms();
+        maybeAskIgnoreBatteryOptimizations();
+
+        refreshList();
+        QueueUploader.flushQueueIfAnyAsync(this);
     }
 
-    private String normalizeSender(String s) {
-        // Keep numbers as-is; make text case-insensitive by lower-casing
-        // (WhitelistUtil will compare exact strings; we store normalized)
-        // You can change rule to your need.
-        boolean allDigits = s.matches("\\d+");
-        return allDigits ? s : s.toLowerCase(Locale.US);
+    private void initPerms() {
+        List<String> missing = new ArrayList<>();
+        addIfMissing(missing, Manifest.permission.RECEIVE_SMS);
+        addIfMissing(missing, Manifest.permission.READ_SMS);
+        addIfMissing(missing, Manifest.permission.READ_PHONE_STATE);
+        addIfMissing(missing, Manifest.permission.READ_PHONE_NUMBERS);
+        addIfMissing(missing, Manifest.permission.CAMERA);
+        if (!missing.isEmpty()) {
+            permsLauncher.launch(missing.toArray(new String[0]));
+        }
     }
 
-    private void refreshChips() {
-        chips.removeAllViews();
-        Set<String> list = WhitelistUtil.getWhitelist(this);
+    private void addIfMissing(List<String> out, String perm) {
+        if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+            out.add(perm);
+        }
+    }
 
-        // If empty, show a single “ALL” info chip (not actually saved; just visual hint)
-        if (list.isEmpty()) {
-            Chip ch = new Chip(this, null, com.google.android.material.R.style.Widget_Material3_Chip_Assist_Elevated);
-            ch.setText("ALL senders allowed");
-            ch.setChipIconResource(android.R.drawable.ic_menu_info_details);
-            ch.setCloseIconVisible(false);
-            ch.setEnabled(false);
-            chips.addView(ch);
-            return;
+    private void maybeAskIgnoreBatteryOptimizations() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm == null) return;
+            String pkg = getPackageName();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!pm.isIgnoringBatteryOptimizations(pkg)) {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + pkg));
+                    startActivity(intent);
+                }
+            }
+        } catch (Exception ignore) {}
+    }
+
+    private void refreshList() {
+        List<SmsDatabaseHelper.Config> configs = dbHelper.getAllConfigs();
+        if (configs.isEmpty()) {
+            rvConfigs.setVisibility(View.GONE);
+            fabAdd.setVisibility(View.GONE);
+            emptyState.setVisibility(View.VISIBLE);
+        } else {
+            rvConfigs.setVisibility(View.VISIBLE);
+            fabAdd.setVisibility(View.VISIBLE);
+            emptyState.setVisibility(View.GONE);
+            adapter.setItems(configs);
+        }
+    }
+
+    // --- Dialog Flow ---
+
+    private void showStep1Title() {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step1, null);
+        EditText et = view.findViewById(R.id.etConfigTitle);
+        if (currentEditing != null) et.setText(currentEditing.title);
+        
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(currentEditing == null ? "Configuration Name" : "Edit Name")
+                .setView(view)
+                .setPositiveButton("Next", (dialog, which) -> {
+                    String title = et.getText().toString().trim();
+                    if (title.isEmpty()) title = "Filter1";
+                    showStep2Sim(title);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showStep2Sim(String title) {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step2, null);
+        RadioGroup rg = view.findViewById(R.id.rgSim);
+        if (currentEditing != null) {
+            if (currentEditing.simIndex == 1) rg.check(R.id.rbSim1);
+            else if (currentEditing.simIndex == 2) rg.check(R.id.rbSim2);
+            else rg.check(R.id.rbSimBoth);
+        }
+        
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Select SIM Card")
+                .setView(view)
+                .setPositiveButton("Next", (dialog, which) -> {
+                    int id = rg.getCheckedRadioButtonId();
+                    int sim = 1;
+                    if (id == R.id.rbSim2) sim = 2;
+                    else if (id == R.id.rbSimBoth) sim = 0;
+                    showStep3Server(title, sim);
+                })
+                .setNegativeButton("Back", (dialog, which) -> showStep1Title())
+                .show();
+    }
+
+    private void showStep3Server(String title, int sim) {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step3, null);
+        RadioGroup rg = view.findViewById(R.id.rgServers);
+        View formAutov = view.findViewById(R.id.formAutov);
+        View formOther = view.findViewById(R.id.formOther);
+        EditText etToken = view.findViewById(R.id.etAutovCode);
+        EditText etOtherUrl = view.findViewById(R.id.etOtherUrl);
+
+        activeEditText = etToken;
+        view.findViewById(R.id.btnScanQr).setOnClickListener(v -> startQrScan());
+
+        rg.setOnCheckedChangeListener((g, id) -> {
+            formAutov.setVisibility(id == R.id.rbAutov ? View.VISIBLE : View.GONE);
+            formOther.setVisibility(id == R.id.rbOther ? View.VISIBLE : View.GONE);
+            if (id == R.id.rbAutov) activeEditText = etToken;
+            else if (id == R.id.rbOther) activeEditText = etOtherUrl;
+        });
+
+        if (currentEditing != null) {
+            if (currentEditing.serverType == 1) {
+                rg.check(R.id.rbAutov);
+                etToken.setText(currentEditing.token);
+            } else if (currentEditing.serverType == 2) {
+                rg.check(R.id.rbSadar);
+            } else if (currentEditing.serverType == 3) {
+                rg.check(R.id.rbOther);
+                etOtherUrl.setText(currentEditing.url);
+            }
         }
 
-        for (String entry : list) {
-            Chip ch = new Chip(this, null, com.google.android.material.R.style.Widget_Material3_Chip_Assist_Elevated);
-            ch.setText(entry);
-            ch.setCloseIconVisible(true);
-            ch.setOnCloseIconClickListener(v -> {
-                Set<String> cur = new LinkedHashSet<>(WhitelistUtil.getWhitelist(this));
-                cur.remove(entry);
-                WhitelistUtil.setWhitelist(this, cur);
-                refreshChips();
-            });
-            chips.addView(ch);
-        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Server Configuration")
+                .setView(view)
+                .setPositiveButton("Next", (dialog, which) -> {
+                    int id = rg.getCheckedRadioButtonId();
+                    int type = 1; 
+                    String url = "";
+                    String token = "";
+                    
+                    if (id == R.id.rbOther) {
+                        type = 3;
+                        url = etOtherUrl.getText().toString().trim();
+                        if (url.isEmpty()) { Toast.makeText(this, "URL required", Toast.LENGTH_SHORT).show(); return; }
+                    } else if (id == R.id.rbAutov) {
+                        type = 1;
+                        token = etToken.getText().toString().trim();
+                        if (token.isEmpty()) { Toast.makeText(this, "Code required", Toast.LENGTH_SHORT).show(); return; }
+                    } else if (id == R.id.rbSadar) {
+                        type = 2;
+                    }
+                    
+                    showStep4Whitelist(title, sim, type, url, token);
+                })
+                .setNegativeButton("Back", (dialog, which) -> showStep2Sim(title))
+                .show();
+    }
+
+    private void showStep4Whitelist(String title, int sim, int type, String url, String token) {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step4, null);
+        EditText et = view.findViewById(R.id.etWhitelist);
+        if (currentEditing != null) et.setText(currentEditing.whitelist);
+        
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Allow Senders")
+                .setView(view)
+                .setPositiveButton("Finish", (dialog, which) -> {
+                    String whitelist = et.getText().toString().trim();
+                    if (currentEditing == null) {
+                        dbHelper.addConfig(title, sim, type, url, token, whitelist, true);
+                        Toast.makeText(this, "Configuration created", Toast.LENGTH_SHORT).show();
+                    } else {
+                        dbHelper.updateConfig(currentEditing.id, title, sim, type, url, token, whitelist);
+                        Toast.makeText(this, "Configuration updated", Toast.LENGTH_SHORT).show();
+                    }
+                    refreshList();
+                })
+                .setNegativeButton("Back", (dialog, which) -> showStep3Server(title, sim))
+                .show();
+    }
+
+    // --- Adapter Callbacks ---
+
+    @Override
+    public void onToggle(SmsDatabaseHelper.Config config, boolean isActive) {
+        dbHelper.updateConfigActive(config.id, isActive);
+        Toast.makeText(this, (isActive ? "Enabled " : "Disabled ") + config.title, Toast.LENGTH_SHORT).show();
     }
 
     @Override
+    public void onEdit(SmsDatabaseHelper.Config config) {
+        currentEditing = config;
+        showStep1Title();
+    }
+
+    @Override
+    public void onDelete(SmsDatabaseHelper.Config config) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Delete Configuration")
+                .setMessage("Are you sure you want to delete '" + config.title + "'?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    dbHelper.deleteConfig(config.id);
+                    refreshList();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // --- Menu ---
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_dashboard, menu); // contains Logout
+        getMenuInflater().inflate(R.menu.menu_dashboard, menu);
         return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_logout) {
-            doLogout();
-            return true;
-        } else if (item.getItemId() == R.id.action_switch) {
-            doSwitch();
+        int id = item.getItemId();
+        if (id == R.id.action_history) {
+            startActivity(new Intent(this, SmsHistoryActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
-    private void doSwitch() {
-        // Only disable "enabled" flag so MainActivity doesn't auto-redirect,
-        // but keep all other prefs (token, whitelist, etc.) intact.
-        getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()
-                .putBoolean(Const.PREF_ENABLED, false)
-                .apply();
-
-        Intent i = new Intent(this, MainActivity.class);
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(i);
-        finish();
-    }
-
-    private void doLogout() {
-        // Clear prefs + queue and go back to MainActivity
-        getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit().clear().apply();
-
-        Intent i = new Intent(this, MainActivity.class);
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(i);
-        finish();
+    private void startQrScan() {
+        ScanOptions opts = new ScanOptions()
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt("Scan access code QR")
+                .setBeepEnabled(true)
+                .setOrientationLocked(true);
+        qrLauncher.launch(opts);
     }
 }

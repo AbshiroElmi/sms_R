@@ -10,6 +10,7 @@ import android.telephony.SubscriptionManager;
 import android.util.Log;
 
 import org.json.JSONObject;
+import java.util.List;
 
 public class SmsReceiver extends BroadcastReceiver {
     private static final String TAG = "SmsReceiver";
@@ -23,9 +24,9 @@ public class SmsReceiver extends BroadcastReceiver {
         try {
             QueueUploader.flushQueueIfAnyAsync(context);
 
-            JSONObject payload = buildPayload(context, intent);
-            if (payload != null && payload.has("type")) {
-                QueueUploader.sendToServerAsync(context, payload, "background-new");
+            JSONObject payloadBase = buildBasePayload(context, intent);
+            if (payloadBase != null) {
+                processIncomingSms(context, payloadBase);
                 QueueUploader.flushQueueIfAnyAsync(context);
             }
         } catch (Exception e) {
@@ -35,7 +36,50 @@ public class SmsReceiver extends BroadcastReceiver {
         }
     }
 
-    private JSONObject buildPayload(Context context, Intent intent) {
+    private void processIncomingSms(Context context, JSONObject payloadBase) {
+        try {
+            long ts = System.currentTimeMillis();
+            String isoDate = payloadBase.optString("date", Iso.now());
+            String fromNumber = payloadBase.optString("from", "");
+            String body = payloadBase.optString("body", "");
+            int subId = payloadBase.optInt("sim_id", -1);
+
+            // Save to History Database once
+            long dbId = SmsDatabaseHelper.getInstance(context).insertSms(
+                    fromNumber, body, ts, SmsDatabaseHelper.STATUS_PENDING, subId, isoDate
+            );
+            payloadBase.put("_db_id", dbId);
+
+            // Get all configs and send if matched
+            List<SmsDatabaseHelper.Config> configs = SmsDatabaseHelper.getInstance(context).getAllConfigs();
+            int matchCount = 0;
+            for (SmsDatabaseHelper.Config config : configs) {
+                if (!config.isActive) continue;
+
+                // SIM Match
+                // simIndex: 0=Both, 1=Sim1, 2=Sim2
+                // detected simIndex (1-based slot index)
+                int detectedSimIndex = payloadBase.optInt("_detected_sim_index", -1);
+                if (config.simIndex != 0 && detectedSimIndex != -1) {
+                    if (config.simIndex != detectedSimIndex) continue;
+                }
+
+                // If matched SIM, trigger async send
+                // QueueUploader will do the whitelist check inside
+                matchCount++;
+                QueueUploader.sendToConfigAsync(context, new JSONObject(payloadBase.toString()), config, "new-sms");
+            }
+
+            if (matchCount == 0) {
+                 Log.d(TAG, "No active config matched for SMS from " + fromNumber);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "processIncomingSms error", e);
+        }
+    }
+
+    private JSONObject buildBasePayload(Context context, Intent intent) {
         try {
             QueueUploader.ensureBaselineNow(context);
             long baseline = QueueUploader.getBaseline(context);
@@ -56,38 +100,15 @@ public class SmsReceiver extends BroadcastReceiver {
             for (Object pdu : pdus) {
                 SmsMessage msg = SmsMessage.createFromPdu((byte[]) pdu, format);
                 if (msg == null) continue;
-
-                if (fromNumber.isEmpty() && msg.getOriginatingAddress() != null) {
-                    fromNumber = msg.getOriginatingAddress();
-                }
+                if (fromNumber.isEmpty() && msg.getOriginatingAddress() != null) fromNumber = msg.getOriginatingAddress();
                 if (msg.getTimestampMillis() > 0) ts = msg.getTimestampMillis();
                 if (msg.getMessageBody() != null) body.append(msg.getMessageBody());
             }
 
             if (ts < baseline) return null;
 
-            // ===== Global ON/OFF from SendAllActivity =====
-            boolean sendAll = context.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE)
-                    .getBoolean(Const.PREF_SEND_ALL, false);
-            if (!sendAll) {
-                // Switch is OFF → do nothing
-                return null;
-            }
-
-            // ===== Whitelist behavior =====
-            if (!WhitelistUtil.hasAny(context)) {
-                // whitelist empty → allow all senders
-            } else if (!WhitelistUtil.isAllowed(context, fromNumber)) {
-                // whitelist has entries and this sender is not in it → skip
-                Log.d(TAG, "Sender '" + fromNumber + "' not in whitelist → skip NEW sms.");
-                return null;
-            }
-
             // SIM info (best-effort)
             SimInfoUtil.SimInfo si = SimInfoUtil.read(context, subId);
-            int configuredSimIndex = context.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE)
-                    .getInt(Const.PREF_SIM_INDEX, 1);
-
             int simSlot = -1;
             int simIndexDetected = -1;
             try {
@@ -101,14 +122,16 @@ public class SmsReceiver extends BroadcastReceiver {
 
             String maskedNumber = SimInfoUtil.maskNumber(si.phoneNumber);
             String deviceId = DeviceIdUtil.get(context);
+            
             JSONObject payload = new JSONObject()
                     .put("type", "incoming_new")
                     .put("device_unique_id", deviceId)
-                    .put("from", fromNumber == null ? "" : fromNumber)
-                    .put("body", sanitizeBody(body == null ? "" : body.toString()))
+                    .put("from", fromNumber)
+                    .put("body", sanitizeBody(body.toString()))
                     .put("sim_id", subId)
                     .put("sim_slot", simSlot)
-                    .put("sim_index", configuredSimIndex) // Use configured index
+                    .put("sim_index", simIndexDetected) // pass detected one for internal matching
+                    .put("_detected_sim_index", simIndexDetected)
                     .put("sim_name", si.label)
                     .put("carrier_name_raw", si.operatorName)
                     .put("operator_numeric", si.operatorNumeric)
@@ -119,21 +142,9 @@ public class SmsReceiver extends BroadcastReceiver {
                     .put("date", Iso.fromMillis(ts));
 
             QueueUploader.maybeAdvanceBaseline(context, ts);
-
-            // Save to History Database before return
-            long dbId = SmsDatabaseHelper.getInstance(context).insertSms(
-                    fromNumber == null ? "" : fromNumber,
-                    sanitizeBody(body == null ? "" : body.toString()),
-                    ts,
-                    SmsDatabaseHelper.STATUS_PENDING,
-                    subId,
-                    Iso.fromMillis(ts)
-            );
-            payload.put("_db_id", dbId);
-
             return payload;
         } catch (Exception e) {
-            Log.e(TAG, "buildPayload error", e);
+            Log.e(TAG, "buildBasePayload error", e);
             return null;
         }
     }

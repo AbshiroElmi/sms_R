@@ -28,7 +28,6 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.Sms">
         <activity android:name=".DashboardActivity" />
-        <activity android:name=".SendAllActivity" />
         <activity android:name=".SmsHistoryActivity" />
 
 

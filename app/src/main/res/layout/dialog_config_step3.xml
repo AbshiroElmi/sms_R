@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <RadioGroup
+            android:id="@+id/rgServers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <RadioButton
+                android:id="@+id/rbAutov"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Autov Server"
+                android:checked="true"
+                android:padding="8dp"/>
+            <RadioButton
+                android:id="@+id/rbSadar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sadar Server"
+                android:padding="8dp"/>
+            <RadioButton
+                android:id="@+id/rbOther"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Other Server"
+                android:padding="8dp"/>
+        </RadioGroup>
+
+        <LinearLayout
+            android:id="@+id/formAutov"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <EditText
+                    android:id="@+id/etAutovCode"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Access Code"
+                    android:padding="12dp"
+                    android:background="@android:drawable/edit_text"/>
+                <ImageButton
+                    android:id="@+id/btnScanQr"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_menu_camera"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:layout_marginStart="8dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/formOther"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp"
+            android:visibility="gone">
+            <EditText
+                android:id="@+id/etOtherUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Enter URL"
+                android:padding="12dp"
+                android:background="@android:drawable/edit_text"/>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

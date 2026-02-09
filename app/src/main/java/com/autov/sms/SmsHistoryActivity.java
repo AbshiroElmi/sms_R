@@ -172,11 +172,25 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                     .put("date", record.isoDate)
                     .put("_db_id", record.id);
 
-            QueueUploader.sendToServerAsync(this, payload, "resend-manual");
-            Toast.makeText(this, "Resending...", Toast.LENGTH_SHORT).show();
-            
-            // Refresh UI in a bit
-            recyclerView.postDelayed(this::loadData, 2000);
+            List<SmsDatabaseHelper.Config> configs = SmsDatabaseHelper.getInstance(this).getAllConfigs();
+            int matchCount = 0;
+            for (SmsDatabaseHelper.Config config : configs) {
+                if (!config.isActive) continue;
+
+                // Match SIM (0=Both)
+                // For resend, we don't have the detected SIM slot easily, but we have record.simId.
+                // We'll skip complex SIM mapping for now or just send it if config is active.
+                
+                matchCount++;
+                QueueUploader.sendToConfigAsync(this, new JSONObject(payload.toString()), config, "resend-manual");
+            }
+
+            if (matchCount > 0) {
+                Toast.makeText(this, "Resending to " + matchCount + " configs...", Toast.LENGTH_SHORT).show();
+                recyclerView.postDelayed(this::loadData, 2000);
+            } else {
+                Toast.makeText(this, "No active configurations found!", Toast.LENGTH_SHORT).show();
+            }
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }

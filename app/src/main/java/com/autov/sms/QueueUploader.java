@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -48,12 +49,6 @@ public class QueueUploader {
      * Public async helpers
      * =========================== */
 
-    /** Run sendToServer() on the background executor */
-    public static void sendToServerAsync(Context ctx, JSONObject payload, String source) {
-        EXEC.execute(() -> sendToServer(ctx, payload, source));
-    }
-
-    /** Run flushQueueIfAny() on the background executor */
     public static void flushQueueIfAnyAsync(Context ctx) {
         EXEC.execute(() -> flushQueueIfAny(ctx));
     }
@@ -126,90 +121,68 @@ public class QueueUploader {
      * Endpoint + headers
      * =========================== */
 
-    /** Resolve the active endpoint based on saved server choice */
-    private static @Nullable String resolveEndpoint(Context ctx) {
-        SharedPreferences sp = ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE);
-        boolean enabled = sp.getBoolean(Const.PREF_ENABLED, false);
-        if (!enabled) {
-            Log.d(TAG, "Uploader disabled; skipping send.");
-            return null;
-        }
-
-        int server = sp.getInt(Const.PREF_SERVER, 1);
-        if (server == 1) {
-            // Autov server
+    private static @Nullable String resolveEndpoint(SmsDatabaseHelper.Config config) {
+        if (config.serverType == 1) {
             return Const.AUTOV_SMS_UPLOAD;
-        } else if (server == 3) {
-            // Other server (use exact URL from prefs)
-            String url = sp.getString(Const.PREF_OTHER_URL, "");
-            if (url == null || url.trim().isEmpty()) {
-                Log.d(TAG, "Other selected but URL empty; skipping send.");
-                return null;
-            }
-            return url.trim();
-        } else {
-            Log.d(TAG, "Unknown server code: " + server + "; skipping send.");
-            return null;
+        } else if (config.serverType == 3) {
+            return config.url;
         }
+        return null;
     }
 
     public static void clearQueue(Context ctx) {
         saveQueue(ctx, new JSONArray());
     }
 
-
-    /** Read Autov token if configured */
-    private static @Nullable String getAutovTokenOrNull(Context ctx) {
-        SharedPreferences sp = ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE);
-        int server = sp.getInt(Const.PREF_SERVER, 1);
-        if (server == 1) {
-            String token = sp.getString(Const.PREF_AUTOV_TOKEN, "");
-            return (token == null || token.isEmpty()) ? null : token;
-        }
-        return null;
-    }
-
     /* ===========================
      * Network: send + flush
      * =========================== */
 
-    public static void sendToServer(Context ctx, JSONObject payload, String source) {
+    public static void sendToConfigAsync(Context ctx, JSONObject payload, SmsDatabaseHelper.Config config, String source) {
+        EXEC.execute(() -> sendToConfig(ctx, payload, config, source));
+    }
+
+    private static void sendToConfig(Context ctx, JSONObject payload, SmsDatabaseHelper.Config config, String source) {
         try {
-
             String from = payload.optString("from", "");
-            if (!WhitelistUtil.isAllowed(ctx, from)) {
-                Log.d(TAG, "Queued/new payload from '" + from + "' blocked by whitelist at send time.");
-                return; // do not POST
-            }
-
-            Log.d(TAG, "➡️ sending [" + source + "] "
-                    + payload.optString("from") + " | " + payload.optString("body"));
-
-            String endpoint = resolveEndpoint(ctx);
-            if (endpoint == null || endpoint.isEmpty()) {
-                enqueueOffline(ctx, payload); // keep for later
+            if (!isAllowedByWhitelist(config.whitelist, from)) {
+                Log.d(TAG, "Config '" + config.title + "' blocks '" + from + "'.");
                 return;
             }
-            Log.d(TAG, "POST endpoint = " + endpoint);
 
-            String autovToken = getAutovTokenOrNull(ctx); // null for Other
+            Log.d(TAG, "➡️ Config '" + config.title + "' sending [" + source + "] " + from);
 
-            ResponseData res = postJson(endpoint, payload, source, null, autovToken);
+            String endpoint = config.serverType == 1 ? Const.AUTOV_SMS_UPLOAD : config.url;
+            String token = config.serverType == 1 ? config.token : null;
+
+            if (endpoint == null || endpoint.isEmpty()) return;
+
+            // Note: We might want a separate queue per config, but for now we'll just try to send
+            ResponseData res = postJson(endpoint, payload, source, null, token);
 
             if (res.code >= 200 && res.code < 300) {
-                Log.d(TAG, "✅ sent [" + source + "] status=" + res.code);
+                Log.d(TAG, "✅ sent status=" + res.code);
                 updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
             } else {
-                Log.d(TAG, "❌ server status=" + res.code + " → queue");
+                Log.d(TAG, "❌ server status=" + res.code);
                 updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
+                // Simple enqueue for now (global queue)
                 enqueueOffline(ctx, payload);
             }
         } catch (Exception e) {
-            String endpoint = resolveEndpoint(ctx); // Might be null or throw, best effort
-            Log.d(TAG, "❌ network error: " + e + " → queue");
-            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, "Exception: " + e.getMessage(), endpoint);
+            Log.d(TAG, "❌ network error: " + e.getMessage());
+            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, "Exception: " + e.getMessage(), config.url);
             enqueueOffline(ctx, payload);
         }
+    }
+
+    private static boolean isAllowedByWhitelist(String whitelist, String from) {
+        if (whitelist == null || whitelist.trim().isEmpty()) return true;
+        String[] parts = whitelist.split(",");
+        for (String p : parts) {
+            if (p.trim().equalsIgnoreCase(from.trim())) return true;
+        }
+        return false;
     }
 
     public static void flushQueueIfAny(Context ctx) {
@@ -219,39 +192,38 @@ public class QueueUploader {
             JSONArray q = loadQueue(ctx);
             if (q.length() == 0) return;
 
-            String endpoint = resolveEndpoint(ctx);
-            if (endpoint == null || endpoint.isEmpty()) {
-                // Not configured; keep queued
-                return;
-            }
-            String autovToken = getAutovTokenOrNull(ctx);
+            List<SmsDatabaseHelper.Config> configs = SmsDatabaseHelper.getInstance(ctx).getAllConfigs();
+            if (configs.isEmpty()) return;
 
             JSONArray remain = new JSONArray();
             for (int i = 0; i < q.length(); i++) {
                 JSONObject item = q.optJSONObject(i);
                 if (item == null) continue;
 
-                String from = item.optString("from", "");
-                if (!WhitelistUtil.isAllowed(ctx, from)) {
-                    // Keep it for later in case user changes selection in Dashboard
-                    remain.put(item);
-                    continue;
+                boolean sentAny = false;
+                for (SmsDatabaseHelper.Config config : configs) {
+                    if (!config.isActive) continue;
+
+                    String from = item.optString("from", "");
+                    if (!isAllowedByWhitelist(config.whitelist, from)) continue;
+
+                    String endpoint = resolveEndpoint(config);
+                    if (endpoint == null) continue;
+
+                    try {
+                        String queuedAt = item.optString("_queuedAt", "");
+                        ResponseData res = postJson(endpoint, item, "flush", queuedAt, config.token);
+                        if (res.code >= 200 && res.code < 300) {
+                            updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
+                            sentAny = true;
+                        } else {
+                            updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
+                        }
+                    } catch (Exception ignore) {}
                 }
 
-                ResponseData res;
-                try {
-                    String queuedAt = item.optString("_queuedAt", "");
-                    res = postJson(endpoint, item, "flush", queuedAt, autovToken);
-                } catch (Exception e) {
-                    res = new ResponseData(-1, "Exception: " + e.getMessage());
-                }
-
-                if (res.code < 200 || res.code >= 300) {
-                    // keep it for future retry
-                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
+                if (!sentAny) {
                     remain.put(item);
-                } else {
-                    updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
                 }
             }
             saveQueue(ctx, remain);

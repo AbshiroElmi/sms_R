@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+    <RadioGroup
+        android:id="@+id/rgSim"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <RadioButton
+            android:id="@+id/rbSim1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SIM 1"
+            android:checked="true"
+            android:padding="8dp"/>
+        <RadioButton
+            android:id="@+id/rbSim2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SIM 2"
+            android:padding="8dp"/>
+        <RadioButton
+            android:id="@+id/rbSimBoth"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Both"
+            android:padding="8dp"/>
+    </RadioGroup>
+</LinearLayout>
