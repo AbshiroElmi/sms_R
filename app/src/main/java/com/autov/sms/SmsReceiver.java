@@ -85,14 +85,17 @@ public class SmsReceiver extends BroadcastReceiver {
 
             // SIM info (best-effort)
             SimInfoUtil.SimInfo si = SimInfoUtil.read(context, subId);
+            int configuredSimIndex = context.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE)
+                    .getInt(Const.PREF_SIM_INDEX, 1);
+
             int simSlot = -1;
-            int simIndexHuman = -1;
+            int simIndexDetected = -1;
             try {
                 SubscriptionManager sm = SubscriptionManager.from(context);
                 SubscriptionInfo info = (sm != null) ? sm.getActiveSubscriptionInfo(subId) : null;
                 if (info != null) {
                     simSlot = info.getSimSlotIndex();
-                    simIndexHuman = (simSlot >= 0) ? simSlot + 1 : -1;
+                    simIndexDetected = (simSlot >= 0) ? simSlot + 1 : -1;
                 }
             } catch (SecurityException ignore) {}
 
@@ -105,7 +108,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     .put("body", sanitizeBody(body == null ? "" : body.toString()))
                     .put("sim_id", subId)
                     .put("sim_slot", simSlot)
-                    .put("sim_index", simIndexHuman)
+                    .put("sim_index", configuredSimIndex) // Use configured index
                     .put("sim_name", si.label)
                     .put("carrier_name_raw", si.operatorName)
                     .put("operator_numeric", si.operatorNumeric)

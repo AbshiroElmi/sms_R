@@ -158,12 +158,16 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             SimInfoUtil.SimInfo si = SimInfoUtil.read(this, record.simId);
             String maskedNumber = SimInfoUtil.maskNumber(si.phoneNumber);
 
+            int configuredSimIndex = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE)
+                    .getInt(Const.PREF_SIM_INDEX, 1);
+
             JSONObject payload = new JSONObject()
                     .put("type", "incoming_resend")
                     .put("device_unique_id", deviceId)
                     .put("from", record.from)
                     .put("body", record.body)
                     .put("sim_id", record.simId)
+                    .put("sim_index", configuredSimIndex) // Use configured index
                     .put("line_number", maskedNumber)
                     .put("date", record.isoDate)
                     .put("_db_id", record.id);

@@ -42,8 +42,10 @@ import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
-    private RadioGroup rgServers;
+    private RadioGroup rgServers, rgSim;
     private RadioButton rbAutov, rbSadar, rbOther;
+
+    private RadioButton rbSim1, rbSim2, rbSimBoth;
     private LinearLayout formAutov, formOther;
     private EditText etAutovCode, etOtherUrl;
     private Button btnConnect;
@@ -102,6 +104,11 @@ public class MainActivity extends AppCompatActivity {
         rbAutov     = findViewById(R.id.rbAutov);
         rbSadar     = findViewById(R.id.rbSadar);
         rbOther     = findViewById(R.id.rbOther);
+        // SIM
+        rgSim       = findViewById(R.id.rgSim);
+        rbSim1      = findViewById(R.id.rbSim1);
+        rbSim2      = findViewById(R.id.rbSim2);
+        rbSimBoth   = findViewById(R.id.rbSimBoth);
         formAutov   = findViewById(R.id.formAutov);
         formOther   = findViewById(R.id.formOther);
         etAutovCode = findViewById(R.id.etAutovCode);
@@ -156,10 +163,19 @@ public class MainActivity extends AppCompatActivity {
         } else if (server == 2) {
             rbSadar.setChecked(true);
         }
+        // Restore SIM
+        int sim = sp.getInt(Const.PREF_SIM_INDEX, 1);
+        if (sim == 2) rbSim2.setChecked(true);
+        else if (sim == 0) rbSimBoth.setChecked(true);
+        else rbSim1.setChecked(true);
     }
 
     private void onConnectClicked() {
         int checkedId = rgServers.getCheckedRadioButtonId();
+        int simIndex = 1;
+        int simChecked = rgSim.getCheckedRadioButtonId();
+        if (simChecked == R.id.rbSim2) simIndex = 2;
+        else if (simChecked == R.id.rbSimBoth) simIndex = 0; // 0 means Both
 
         if (checkedId == R.id.rbAutov) {
             String token = etAutovCode.getText().toString().trim();
@@ -167,7 +183,7 @@ public class MainActivity extends AppCompatActivity {
                 toast("Enter access code");
                 return;
             }
-            verifyAutovToken(token); // on success → save & go to SendAll
+            verifyAutovToken(token, simIndex); // on success → save & go to SendAll
             return;
         }
 
@@ -178,7 +194,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             url = url.replace(" ", "");
-            saveServerChoice(3, null, url, true);
+            saveServerChoice(3, null, url, true, simIndex);
             toast("Connected to Other server");
             QueueUploader.flushQueueIfAnyAsync(this);
 
@@ -195,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
 
         toast("Select a server first");
     }
-    private void verifyAutovToken(String token) {
+    private void verifyAutovToken(String token, int simIndex) {
         showProgress(true);
 
         Executors.newSingleThreadExecutor().execute(() -> {
@@ -239,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
 
                         runOnUiThread(() -> {
                             showProgress(false);
-                            saveServerChoice(1, token, null, true);
+                            saveServerChoice(1, token, null, true, simIndex);
                             toast("Verified! Connected to Autov");
                             startActivity(intent);
                             finish();
@@ -271,9 +287,10 @@ public class MainActivity extends AppCompatActivity {
         return (int) ((level / (float) scale) * 100);
     }
 
-    private void saveServerChoice(int server, @Nullable String token, @Nullable String otherUrl, boolean enabled) {
+    private void saveServerChoice(int server, @Nullable String token, @Nullable String otherUrl, boolean enabled, int simIndex) {
         getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE).edit()
                 .putInt(Const.PREF_SERVER, server)
+                .putInt(Const.PREF_SIM_INDEX, simIndex)
                 .putBoolean(Const.PREF_ENABLED, enabled)
                 .apply();
         if (token != null) {
