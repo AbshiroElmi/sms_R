@@ -32,7 +32,10 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     private RecyclerView recyclerView;
     private SmsAdapter adapter;
     private TextView tvDateFilter;
-    private MaterialButton btnClearFilter;
+    private android.widget.EditText etSearch;
+    private View searchContainer;
+    private MaterialButton btnClearFilter, btnSearch;
+    private View btnCloseSearch;
     private String currentDateFilter = null;
 
     @Override
@@ -60,7 +63,41 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         recyclerView.setAdapter(adapter);
 
         tvDateFilter = findViewById(R.id.tvDateFilter);
+        btnSearch = findViewById(R.id.btnSearch);
+        searchContainer = findViewById(R.id.searchContainer);
+        etSearch = findViewById(R.id.etSearch);
+        btnCloseSearch = findViewById(R.id.btnCloseSearch);
         btnClearFilter = findViewById(R.id.btnClearFilter);
+
+        btnSearch.setOnClickListener(v -> {
+            if (searchContainer.getVisibility() == View.VISIBLE) {
+                // If already visible, hide it
+                searchContainer.setVisibility(View.GONE);
+                etSearch.setText(""); // Clear search when hiding? Optional.
+                loadData();
+            } else {
+                searchContainer.setVisibility(View.VISIBLE);
+                etSearch.requestFocus();
+                // Show keyboard logic could be added here
+            }
+        });
+
+        btnCloseSearch.setOnClickListener(v -> {
+            etSearch.setText("");
+            searchContainer.setVisibility(View.GONE);
+            loadData();
+        });
+
+        etSearch.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                loadData();
+            }
+            @Override
+            public void afterTextChanged(android.text.Editable s) {}
+        });
 
         findViewById(R.id.btnPickDate).setOnClickListener(v -> showDatePicker());
         btnClearFilter.setOnClickListener(v -> {
@@ -92,7 +129,8 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
     private void loadData() {
         List<SmsAdapter.SmsRecord> records = new ArrayList<>();
-        Cursor cursor = SmsDatabaseHelper.getInstance(this).getAllSmsCursor(currentDateFilter);
+        String searchText = etSearch != null ? etSearch.getText().toString() : null;
+        Cursor cursor = SmsDatabaseHelper.getInstance(this).getAllSmsCursor(currentDateFilter, searchText);
         
         if (cursor != null) {
             while (cursor.moveToNext()) {

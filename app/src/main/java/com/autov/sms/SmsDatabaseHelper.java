@@ -123,15 +123,33 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         db.update(TABLE_SMS, values, COLUMN_ID + "=?", new String[]{String.valueOf(id)});
     }
 
-    public Cursor getAllSmsCursor(String dateFilter) {
+    public Cursor getAllSmsCursor(String dateFilter, String searchText) {
         SQLiteDatabase db = this.getReadableDatabase();
-        String selection = null;
-        String[] selectionArgs = null;
+        StringBuilder selection = new StringBuilder();
+        List<String> argsList = new ArrayList<>();
+
         if (dateFilter != null && !dateFilter.isEmpty()) {
-            selection = COLUMN_ISO_DATE + " LIKE ?";
-            selectionArgs = new String[]{dateFilter + "%"};
+            selection.append(COLUMN_ISO_DATE + " LIKE ?");
+            argsList.add(dateFilter + "%");
         }
-        return db.query(TABLE_SMS, null, selection, selectionArgs, null, null, COLUMN_TIMESTAMP + " DESC");
+
+        if (searchText != null && !searchText.trim().isEmpty()) {
+            if (selection.length() > 0) selection.append(" AND ");
+            selection.append("(" + COLUMN_FROM + " LIKE ? OR " + COLUMN_BODY + " LIKE ?)");
+            String term = "%" + searchText.trim() + "%";
+            argsList.add(term);
+            argsList.add(term);
+        }
+
+        String sel = selection.length() == 0 ? null : selection.toString();
+        String[] selArgs = argsList.isEmpty() ? null : argsList.toArray(new String[0]);
+
+        return db.query(TABLE_SMS, null, sel, selArgs, null, null, COLUMN_TIMESTAMP + " DESC");
+    }
+
+    // Overload for backward compatibility if needed, though we will update the usage
+    public Cursor getAllSmsCursor(String dateFilter) {
+        return getAllSmsCursor(dateFilter, null);
     }
     public void deleteAllSms() {
         SQLiteDatabase db = this.getWritableDatabase();
