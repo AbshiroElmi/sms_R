@@ -17,7 +17,7 @@
         android:layout_height="wrap_content"
         android:hint="Allowed Senders"
         app:placeholderText="e.g. 192, Notice"
-        app:placeholderTextColor="#757575"
+        app:placeholderTextColor="@color/grey_text"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/etWhitelist"

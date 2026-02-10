@@ -1,7 +1,29 @@
 <!-- res/values/themes.xml -->
 <resources>
     <style name="Theme.Sms" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Main colors -->
+        <item name="colorPrimary">@color/colorPrimaryBrand</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSurface">@color/colorDialogBg</item>
+        <item name="colorOnSurface">@color/black</item>
+        
+        <!-- Dialog Styling -->
+        <item name="materialAlertDialogTheme">@style/CustomAlertDialog</item>
+
         <!-- Disable Android's automatic "force dark" -->
         <item name="android:forceDarkAllowed">false</item>
+    </style>
+
+    <style name="CustomAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- Dialog background fixed to #F2F2F2 -->
+        <item name="android:background">@color/colorDialogBg</item>
+        <item name="colorSurface">@color/colorDialogBg</item>
+        <item name="colorSurfaceVariant">@color/colorDialogBg</item>
+        
+        <!-- Removing elevation is the only way to stop the green tint in some M3 versions -->
+        <item name="elevation">0dp</item>
+        
+        <!-- Button text color -->
+        <item name="colorPrimary">@color/colorPrimaryBrand</item>
     </style>
 </resources>
