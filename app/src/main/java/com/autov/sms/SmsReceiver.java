@@ -44,9 +44,11 @@ public class SmsReceiver extends BroadcastReceiver {
             String body = payloadBase.optString("body", "");
             int subId = payloadBase.optInt("sim_id", -1);
 
+            int simIndex = payloadBase.optInt("sim_index", -1);
+
             // Save to History Database once
             long dbId = SmsDatabaseHelper.getInstance(context).insertSms(
-                    fromNumber, body, ts, SmsDatabaseHelper.STATUS_PENDING, subId, isoDate
+                    fromNumber, body, ts, SmsDatabaseHelper.STATUS_PENDING, subId, simIndex, isoDate
             );
             payloadBase.put("_db_id", dbId);
 

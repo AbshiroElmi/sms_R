@@ -11,7 +11,7 @@ import java.util.List;
 
 public class SmsDatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "sms_history.db";
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
 
     public static final String TABLE_SMS = "sms_history";
     public static final String COLUMN_ID = "id";
@@ -20,6 +20,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_TIMESTAMP = "timestamp";
     public static final String COLUMN_STATUS = "status"; // 0: Pending, 1: Sent, 2: Failed
     public static final String COLUMN_SIM_ID = "sim_id";
+    public static final String COLUMN_SIM_INDEX = "sim_index"; // 1 or 2 for display
     public static final String COLUMN_ISO_DATE = "iso_date";
     public static final String COLUMN_RESPONSE = "response_data";
     public static final String COLUMN_URL = "req_url";
@@ -60,6 +61,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_TIMESTAMP + " INTEGER, " +
                 COLUMN_STATUS + " INTEGER, " +
                 COLUMN_SIM_ID + " INTEGER, " +
+                COLUMN_SIM_INDEX + " INTEGER, " +
                 COLUMN_ISO_DATE + " TEXT, " +
                 COLUMN_RESPONSE + " TEXT, " +
                 COLUMN_URL + " TEXT)";
@@ -93,9 +95,12 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
                 COL_CONFIG_ACTIVE + " INTEGER)";
              try { db.execSQL(createConfigTable); } catch(Exception e){}
         }
+        if (oldVersion < 7) {
+            try { db.execSQL("ALTER TABLE " + TABLE_SMS + " ADD COLUMN " + COLUMN_SIM_INDEX + " INTEGER"); } catch(Exception e){}
+        }
     }
 
-    public long insertSms(String from, String body, long timestamp, int status, int simId, String isoDate) {
+    public long insertSms(String from, String body, long timestamp, int status, int simId, int simIndex, String isoDate) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(COLUMN_FROM, from);
@@ -103,6 +108,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         values.put(COLUMN_TIMESTAMP, timestamp);
         values.put(COLUMN_STATUS, status);
         values.put(COLUMN_SIM_ID, simId);
+        values.put(COLUMN_SIM_INDEX, simIndex);
         values.put(COLUMN_ISO_DATE, isoDate);
         return db.insert(TABLE_SMS, null, values);
     }
