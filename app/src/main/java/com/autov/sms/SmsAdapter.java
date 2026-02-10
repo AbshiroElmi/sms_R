@@ -10,7 +10,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.button.MaterialButton;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,35 +48,19 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
         holder.tvBody.setText(record.body);
         holder.tvTime.setText(record.isoDate);
 
+        holder.ivDropdown.setVisibility(View.VISIBLE);
+        holder.ivDropdown.setOnClickListener(v -> showStatusMenu(v, record));
+
         if (record.status == SmsDatabaseHelper.STATUS_SENT) {
-            holder.tvStatus.setText("SENT"); // No extra text
+            holder.tvStatus.setText("SENT");
             holder.tvStatus.setBackgroundColor(Color.parseColor("#4CAF50"));
-            holder.tvStatus.setClickable(false); // Text badge static
-            holder.tvStatus.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0); // No inline arrow
-            holder.ivDropdown.setVisibility(View.VISIBLE);
-            holder.ivDropdown.setOnClickListener(v -> showStatusMenu(v, record));
-            holder.btnResend.setVisibility(View.GONE);
         } else if (record.status == SmsDatabaseHelper.STATUS_PENDING) {
             holder.tvStatus.setText("PENDING");
             holder.tvStatus.setBackgroundColor(Color.parseColor("#FF9800"));
-            holder.tvStatus.setClickable(false);
-            holder.tvStatus.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
-            holder.ivDropdown.setVisibility(View.GONE);
-            holder.ivDropdown.setOnClickListener(null);
-            holder.btnResend.setVisibility(View.VISIBLE);
         } else {
             holder.tvStatus.setText("FAILED");
             holder.tvStatus.setBackgroundColor(Color.parseColor("#F44336"));
-            holder.tvStatus.setClickable(false);
-            holder.tvStatus.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0);
-            holder.ivDropdown.setVisibility(View.VISIBLE);
-            holder.ivDropdown.setOnClickListener(v -> showStatusMenu(v, record));
-            holder.btnResend.setVisibility(View.VISIBLE);
         }
-
-        holder.btnResend.setOnClickListener(v -> {
-            if (listener != null) listener.onResendClick(record);
-        });
     }
 
     private void showStatusMenu(View v, SmsRecord record) {
@@ -102,7 +86,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
     public static class ViewHolder extends RecyclerView.ViewHolder {
         TextView tvFrom, tvBody, tvStatus, tvTime;
         android.widget.ImageView ivDropdown;
-        MaterialButton btnResend;
+
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -111,7 +95,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
             tvStatus = itemView.findViewById(R.id.tvStatus);
             ivDropdown = itemView.findViewById(R.id.ivDropdown);
             tvTime = itemView.findViewById(R.id.tvTime);
-            btnResend = itemView.findViewById(R.id.btnResend);
+
         }
     }
 
