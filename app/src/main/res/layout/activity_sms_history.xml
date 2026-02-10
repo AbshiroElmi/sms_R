@@ -20,6 +20,7 @@
                 android:layout_height="?attr/actionBarSize"
                 android:background="#00B09B"
                 app:title="SMS History"
+                android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
                 app:titleTextColor="@android:color/white" />
         </com.google.android.material.appbar.AppBarLayout>
 
@@ -110,12 +111,41 @@
                     android:background="?attr/selectableItemBackgroundBorderless"/>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="8dp"
-            android:clipToPadding="false" />
+            android:layout_height="match_parent">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="8dp"
+                android:clipToPadding="false" />
+
+            <LinearLayout
+                android:id="@+id/emptyState"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:src="@android:drawable/ic_menu_recent_history"
+                    app:tint="#D1D5DB"
+                    android:layout_marginBottom="16dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="There is no history yet"
+                    android:textSize="18sp"
+                    android:textColor="#9CA3AF"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+        </FrameLayout>
 
     </LinearLayout>
 
