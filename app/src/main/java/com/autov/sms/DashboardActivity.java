@@ -68,6 +68,10 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toolbar.setNavigationOnClickListener(v -> finish());
 
         rvConfigs = findViewById(R.id.rvConfigs);
         emptyState = findViewById(R.id.emptyState);
@@ -296,11 +300,6 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.action_history) {
-            startActivity(new Intent(this, SmsHistoryActivity.class));
-            return true;
-        }
         return super.onOptionsItemSelected(item);
     }
 

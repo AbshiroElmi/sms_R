@@ -48,14 +48,14 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         ).setAppearanceLightStatusBars(false);
 
         super.onCreate(savedInstanceState);
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
         setContentView(R.layout.activity_sms_history);
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);
         }
-        toolbar.setNavigationOnClickListener(v -> finish());
 
         recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -232,8 +232,12 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_clear_history) {
+        int id = item.getItemId();
+        if (id == R.id.action_clear_history) {
             showClearHistoryDialog();
+            return true;
+        } else if (id == R.id.action_config) {
+            startActivity(new android.content.Intent(this, DashboardActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);
