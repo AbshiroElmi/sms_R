@@ -205,8 +205,6 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
             if (currentEditing.serverType == 1) {
                 rg.check(R.id.rbAutov);
                 etToken.setText(currentEditing.token);
-            } else if (currentEditing.serverType == 2) {
-                rg.check(R.id.rbSadar);
             } else if (currentEditing.serverType == 3) {
                 rg.check(R.id.rbOther);
                 etOtherUrl.setText(currentEditing.url);
@@ -230,8 +228,6 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
                         type = 1;
                         token = etToken.getText().toString().trim();
                         if (token.isEmpty()) { Toast.makeText(this, "Code required", Toast.LENGTH_SHORT).show(); return; }
-                    } else if (id == R.id.rbSadar) {
-                        type = 2;
                     }
                     
                     showStep4Whitelist(title, sim, type, url, token);

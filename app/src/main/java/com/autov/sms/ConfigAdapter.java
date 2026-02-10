@@ -45,7 +45,7 @@ public class ConfigAdapter extends RecyclerView.Adapter<ConfigAdapter.ViewHolder
         holder.tvTitle.setText(config.title);
         
         String sim = config.simIndex == 0 ? "Both" : (config.simIndex == 1 ? "SIM 1" : "SIM 2");
-        String server = config.serverType == 1 ? "Autov" : (config.serverType == 3 ? "Other" : "Sadar");
+        String server = config.serverType == 1 ? "AutoSms" : "Other";
         String wl = (config.whitelist == null || config.whitelist.isEmpty()) ? "All senders" : "Whitelist";
         
         holder.tvDetails.setText(sim + " • " + server + " • " + wl);
