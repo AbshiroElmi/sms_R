@@ -54,9 +54,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-        getWindow().setStatusBarColor(
-                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
-        );
+        getWindow().setStatusBarColor(android.graphics.Color.parseColor("#00B09B"));
         new androidx.core.view.WindowInsetsControllerCompat(
                 getWindow(), getWindow().getDecorView()
         ).setAppearanceLightStatusBars(false);
