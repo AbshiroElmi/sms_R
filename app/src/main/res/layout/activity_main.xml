@@ -79,7 +79,7 @@
                                 android:id="@+id/rbAutov"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:text="Autov Server"
+                                android:text="AutoSms Server"
                                 android:padding="12dp"/>
 
                             <View
