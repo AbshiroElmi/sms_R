@@ -33,29 +33,28 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     private SmsAdapter adapter;
     private TextView tvDateFilter;
     private android.widget.EditText etSearch;
-    private View searchContainer;
+    private View searchContainer, emptyState;
     private MaterialButton btnClearFilter, btnSearch;
     private View btnCloseSearch;
     private String currentDateFilter = null;
+    private boolean hasHistory = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-        getWindow().setStatusBarColor(
-                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
-        );
+        getWindow().setStatusBarColor(android.graphics.Color.parseColor("#00B09B"));
         new androidx.core.view.WindowInsetsControllerCompat(
                 getWindow(), getWindow().getDecorView()
         ).setAppearanceLightStatusBars(false);
 
         super.onCreate(savedInstanceState);
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
         setContentView(R.layout.activity_sms_history);
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);
         }
-        toolbar.setNavigationOnClickListener(v -> finish());
 
         recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -68,6 +67,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         etSearch = findViewById(R.id.etSearch);
         btnCloseSearch = findViewById(R.id.btnCloseSearch);
         btnClearFilter = findViewById(R.id.btnClearFilter);
+        emptyState = findViewById(R.id.emptyState);
 
         btnSearch.setOnClickListener(v -> {
             if (searchContainer.getVisibility() == View.VISIBLE) {
@@ -141,6 +141,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                         cursor.getLong(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_TIMESTAMP)),
                         cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_STATUS)),
                         cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_SIM_ID)),
+                        cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_SIM_INDEX)),
                         cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_ISO_DATE)),
                         cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_RESPONSE)),
                         cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_URL))
@@ -149,6 +150,16 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             cursor.close();
         }
         adapter.setItems(records);
+        hasHistory = !records.isEmpty();
+        invalidateOptionsMenu();
+        
+        if (!hasHistory) {
+            recyclerView.setVisibility(View.GONE);
+            emptyState.setVisibility(View.VISIBLE);
+        } else {
+            recyclerView.setVisibility(View.VISIBLE);
+            emptyState.setVisibility(View.GONE);
+        }
     }
 
     @Override
@@ -231,9 +242,22 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem clearItem = menu.findItem(R.id.action_clear_history);
+        if (clearItem != null) {
+            clearItem.setVisible(hasHistory);
+        }
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_clear_history) {
+        int id = item.getItemId();
+        if (id == R.id.action_clear_history) {
             showClearHistoryDialog();
+            return true;
+        } else if (id == R.id.action_config) {
+            startActivity(new android.content.Intent(this, DashboardActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);

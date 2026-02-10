@@ -48,6 +48,17 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
         holder.tvBody.setText(record.body);
         holder.tvTime.setText(record.isoDate);
 
+        // Display SIM information using sim_index (1 or 2)
+        String simText;
+        if (record.simIndex == 1) {
+            simText = "SIM 1";
+        } else if (record.simIndex == 2) {
+            simText = "SIM 2";
+        } else {
+            simText = "SIM ?";
+        }
+        holder.tvSim.setText(simText);
+
         holder.ivDropdown.setVisibility(View.VISIBLE);
         holder.ivDropdown.setOnClickListener(v -> showStatusMenu(v, record));
 
@@ -86,7 +97,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView tvFrom, tvBody, tvStatus, tvTime;
+        TextView tvFrom, tvBody, tvStatus, tvTime, tvSim;
         android.widget.ImageView ivDropdown;
 
 
@@ -97,6 +108,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
             tvStatus = itemView.findViewById(R.id.tvStatus);
             ivDropdown = itemView.findViewById(R.id.ivDropdown);
             tvTime = itemView.findViewById(R.id.tvTime);
+            tvSim = itemView.findViewById(R.id.tvSim);
 
         }
     }
@@ -108,17 +120,19 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
         long timestamp;
         int status;
         int simId;
+        int simIndex; // 1 or 2 for display
         String isoDate;
         String response;
         String url;
 
-        public SmsRecord(long id, String from, String body, long timestamp, int status, int simId, String isoDate, String response, String url) {
+        public SmsRecord(long id, String from, String body, long timestamp, int status, int simId, int simIndex, String isoDate, String response, String url) {
             this.id = id;
             this.from = from;
             this.body = body;
             this.timestamp = timestamp;
             this.status = status;
             this.simId = simId;
+            this.simIndex = simIndex;
             this.isoDate = isoDate;
             this.response = response;
             this.url = url;

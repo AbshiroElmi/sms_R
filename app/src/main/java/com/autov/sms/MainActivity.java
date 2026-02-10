@@ -13,8 +13,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
 
-        // Redirect to Dashboard (the new main screen)
-        startActivity(new Intent(this, DashboardActivity.class));
+        // Redirect to History (the new main screen)
+        startActivity(new Intent(this, SmsHistoryActivity.class));
         finish();
     }
 }

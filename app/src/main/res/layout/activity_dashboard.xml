@@ -21,6 +21,7 @@
                 android:layout_height="?attr/actionBarSize"
                 android:background="#00B09B"
                 app:title="SMS Gateway"
+                android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
                 app:titleTextColor="@android:color/white" />
         </com.google.android.material.appbar.AppBarLayout>
 

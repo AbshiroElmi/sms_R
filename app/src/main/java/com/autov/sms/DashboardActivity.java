@@ -54,9 +54,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
-        getWindow().setStatusBarColor(
-                androidx.core.content.ContextCompat.getColor(this, R.color.purple_500)
-        );
+        getWindow().setStatusBarColor(android.graphics.Color.parseColor("#00B09B"));
         new androidx.core.view.WindowInsetsControllerCompat(
                 getWindow(), getWindow().getDecorView()
         ).setAppearanceLightStatusBars(false);
@@ -68,6 +66,10 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toolbar.setNavigationOnClickListener(v -> finish());
 
         rvConfigs = findViewById(R.id.rvConfigs);
         emptyState = findViewById(R.id.emptyState);
@@ -296,11 +298,6 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.action_history) {
-            startActivity(new Intent(this, SmsHistoryActivity.class));
-            return true;
-        }
         return super.onOptionsItemSelected(item);
     }
 
