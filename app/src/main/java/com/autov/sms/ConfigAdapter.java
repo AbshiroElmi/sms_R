@@ -55,7 +55,7 @@ public class ConfigAdapter extends RecyclerView.Adapter<ConfigAdapter.ViewHolder
         holder.swActive.setOnCheckedChangeListener((b, checked) -> listener.onToggle(config, checked));
         
         holder.btnMenu.setOnClickListener(v -> {
-            PopupMenu popup = new PopupMenu(v.getContext(), v);
+            androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(v.getContext(), v, android.view.Gravity.END);
             popup.getMenuInflater().inflate(R.menu.menu_config_item, popup.getMenu());
             popup.setOnMenuItemClickListener(item -> {
                 int id = item.getItemId();

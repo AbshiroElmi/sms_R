@@ -64,16 +64,18 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
     }
 
     private void showStatusMenu(View v, SmsRecord record) {
-        android.widget.PopupMenu popup = new android.widget.PopupMenu(v.getContext(), v);
-        popup.getMenu().add("Detail");
-        popup.getMenu().add("Resend");
+        androidx.appcompat.widget.PopupMenu popup = new androidx.appcompat.widget.PopupMenu(v.getContext(), v, android.view.Gravity.END);
+        popup.getMenuInflater().inflate(R.menu.menu_sms_item, popup.getMenu());
         popup.setOnMenuItemClickListener(item -> {
-            if (item.getTitle().equals("Detail")) {
+            int id = item.getItemId();
+            if (id == R.id.action_detail) {
                 if (listener != null) listener.onDetailClick(record);
-            } else if (item.getTitle().equals("Resend")) {
+                return true;
+            } else if (id == R.id.action_resend) {
                 if (listener != null) listener.onResendClick(record);
+                return true;
             }
-            return true;
+            return false;
         });
         popup.show();
     }
