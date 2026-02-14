@@ -1,5 +1,7 @@
 package com.autov.sms;
 
+import static com.autov.sms.Const.PREF_NAME;
+
 import android.content.Context;
 import android.content.SharedPreferences;
 
@@ -15,7 +17,7 @@ public final class WhitelistUtil {
 
     /** Return the current whitelist. Empty = ALL allowed. */
     public static Set<String> getWhitelist(Context ctx) {
-        SharedPreferences sp = ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE);
+        SharedPreferences sp = ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         String csv = sp.getString(KEY, "");
         Set<String> out = new LinkedHashSet<>();
         if (csv == null || csv.trim().isEmpty()) return out;
@@ -34,7 +36,7 @@ public final class WhitelistUtil {
             if (!v.isEmpty()) norm.add(v);
         }
         String csv = String.join(",", norm);
-        ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE)
+        ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit().putString(KEY, csv).apply();
     }
 
@@ -67,7 +69,7 @@ public final class WhitelistUtil {
 
     /** Clear list (ALL allowed). */
     public static void clear(Context ctx) {
-        ctx.getSharedPreferences(Const.PREF_NAME, Context.MODE_PRIVATE)
+        ctx.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
                 .edit().remove(KEY).apply();
     }
 

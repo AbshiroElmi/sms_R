@@ -38,9 +38,12 @@ import java.util.concurrent.Executors;
  */
 public class QueueUploader {
     private static final String TAG = "QueueUploader";
+    
+    // Broadcast action for SMS status updates
+    public static final String ACTION_SMS_STATUS_UPDATED = "com.autov.sms.SMS_STATUS_UPDATED";
 
-    // Single reusable background executor (no network on main thread)
-    private static final ExecutorService EXEC = Executors.newSingleThreadExecutor();
+    // CachedThreadPool allows parallel execution (so resends aren't blocked by background flushing)
+    private static final ExecutorService EXEC = Executors.newCachedThreadPool();
 
     // Guard to avoid concurrent flushes
     private static volatile boolean isFlushing = false;
@@ -152,10 +155,18 @@ public class QueueUploader {
 
             Log.d(TAG, "➡️ Config '" + config.title + "' sending [" + source + "] " + from);
 
-            String endpoint = config.serverType == 1 ? Const.AUTOV_SMS_UPLOAD : config.url;
+            // Ensure we use the correct endpoint based on type
+            String endpoint = config.url;
+            if (config.serverType == 1) {
+                endpoint = Const.AUTOV_SMS_UPLOAD;
+            }
+
             String token = config.serverType == 1 ? config.token : null;
 
-            if (endpoint == null || endpoint.isEmpty()) return;
+            if (endpoint == null || endpoint.isEmpty()) {
+                Log.e(TAG, "Config '" + config.title + "' has no URL configured!");
+                return;
+            }
 
             // Note: We might want a separate queue per config, but for now we'll just try to send
             ResponseData res = postJson(endpoint, payload, source, null, token);
@@ -165,13 +176,22 @@ public class QueueUploader {
                 updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
             } else {
                 Log.d(TAG, "❌ server status=" + res.code);
-                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
+                // Include HTTP code in the failure reason
+                String reason = "HTTP " + res.code;
+                if (res.body != null && !res.body.isEmpty()) reason += "\n" + res.body;
+                
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, reason, endpoint);
                 // Simple enqueue for now (global queue)
                 enqueueOffline(ctx, payload);
             }
         } catch (Exception e) {
             Log.d(TAG, "❌ network error: " + e.getMessage());
-            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, "Exception: " + e.getMessage(), config.url);
+            String errorMsg = "Network Error: " + e.getMessage();
+            if (e instanceof java.net.SocketTimeoutException) errorMsg = "Connection Timeout";
+            if (e instanceof java.net.UnknownHostException) errorMsg = "Unknown Host (Check URL)";
+            if (e instanceof java.net.ConnectException) errorMsg = "Connection Refused (Server Down?)";
+            
+            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, errorMsg, config.url);
             enqueueOffline(ctx, payload);
         }
     }
@@ -283,6 +303,12 @@ public class QueueUploader {
         long dbId = payload.optLong("_db_id", -1);
         if (dbId != -1) {
             SmsDatabaseHelper.getInstance(ctx).updateStatusResponseAndUrl(dbId, status, response, url);
+            
+            // Notify UI that SMS status was updated
+            android.content.Intent intent = new android.content.Intent(ACTION_SMS_STATUS_UPDATED);
+            intent.putExtra("sms_id", dbId);
+            intent.putExtra("status", status);
+            ctx.sendBroadcast(intent);
         }
     }
 

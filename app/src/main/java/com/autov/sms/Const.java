@@ -17,8 +17,8 @@ public final class Const {
 
     public static final String PREF_WHITELIST_SENDER = "whitelist_sender";
 
-//    public static final String AUTOVSERVER = "https://autov.easytouch.cloud";
-    public static final String AUTOVSERVER = "http://192.168.100.205:8001";
+    public static final String AUTOVSERVER = "https://autov.easytouch.cloud";
+//    public static final String AUTOVSERVER = "http://192.168.100.205:8001";
 
     // Your default Autov SMS endpoint (if used)
     public static final String AUTOV_SMS_UPLOAD = AUTOVSERVER+"/api/method/autov.api.sms_upload";

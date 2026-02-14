@@ -1,0 +1,143 @@
+SMS FORWARDING FLOW DIAGRAM
+═══════════════════════════════════════════════════════════════════
+
+                        📱 SMS RECEIVED
+                              │
+                              ▼
+                  ┌───────────────────────┐
+                  │  Save to Database     │
+                  │  Status: PENDING      │
+                  └───────────────────────┘
+                              │
+                              ▼
+                  ┌───────────────────────┐
+                  │ Get All Configurations│
+                  │  from Database        │
+                  └───────────────────────┘
+                              │
+                              ▼
+                  ┌───────────────────────┐
+                  │ Any Active Configs?   │
+                  └───────────────────────┘
+                         /          \
+                    NO /              \ YES
+                      /                  \
+                     ▼                    ▼
+        ┌──────────────────┐    ┌──────────────────┐
+        │ Show Notification│    │ For Each Config: │
+        │ "No Configuration"│    │                  │
+        │                  │    │ 1. Check SIM     │
+        │ 🔔 Tap to create │    │ 2. Check Whitelist│
+        │    configuration │    └──────────────────┘
+        └──────────────────┘              │
+                 │                        ▼
+                 │              ┌──────────────────┐
+                 │              │ Config Matches?  │
+                 │              └──────────────────┘
+                 │                   /          \
+                 │              YES /              \ NO
+                 │                 /                  \
+                 │                ▼                    ▼
+                 │    ┌──────────────────┐      ┌──────────┐
+                 │    │ Forward SMS to   │      │   Skip   │
+                 │    │ Config Server    │      └──────────┘
+                 │    │                  │
+                 │    │ 🌐 POST to URL   │
+                 │    └──────────────────┘
+                 │                │
+                 │                ▼
+                 │    ┌──────────────────┐
+                 │    │ Update Database: │
+                 │    │ • SENT (200-299) │
+                 │    │ • FAILED (other) │
+                 │    │ • Save Response  │
+                 │    │ • Save URL       │
+                 │    └──────────────────┘
+                 │                │
+                 └────────────────┴────────────────┐
+                                                   │
+                                                   ▼
+                                        ┌──────────────────┐
+                                        │ Any Match Found? │
+                                        └──────────────────┘
+                                             /          \
+                                        NO /              \ YES
+                                          /                  \
+                                         ▼                    ▼
+                            ┌──────────────────┐    ┌──────────────┐
+                            │ Show Notification│    │     Done     │
+                            │ "No Configuration"│    │              │
+                            │                  │    │  ✅ SMS Sent  │
+                            │ 🔔 Tap to create │    └──────────────┘
+                            └──────────────────┘
+
+
+CONFIGURATION MATCHING RULES
+═══════════════════════════════════════════════════════════════════
+
+A configuration matches an SMS if ALL of these are true:
+
+✅ 1. Configuration is ACTIVE (toggle is ON)
+
+✅ 2. SIM CARD MATCHES:
+   • Config SIM = 0 (Both)     → ✓ Accepts all SIM cards
+   • Config SIM = 1 (SIM 1)    → ✓ Only if SMS from SIM 1
+   • Config SIM = 2 (SIM 2)    → ✓ Only if SMS from SIM 2
+
+✅ 3. SENDER IS WHITELISTED:
+   • Whitelist is empty        → ✓ Accepts all senders
+   • Whitelist has numbers     → ✓ Only if sender is in list
+   • Example: "192,193,194"    → ✓ Only these numbers
+
+
+SERVER TYPES
+═══════════════════════════════════════════════════════════════════
+
+📡 Type 1: Autov Server
+   • URL: Const.AUTOV_SMS_UPLOAD
+   • Current: http://192.168.100.205:8001/api/method/autov.api.sms_upload
+   • Requires: Authentication Token
+   • Header: X-Autov-Token
+
+🌐 Type 3: Custom Server
+   • URL: User-defined (e.g., http://example.com/api/sms)
+   • No authentication required
+   • Receives JSON payload with SMS data
+
+
+NOTIFICATION BEHAVIOR
+═══════════════════════════════════════════════════════════════════
+
+🔔 When is notification shown?
+   • No configurations exist
+   • All configurations are INACTIVE (toggled OFF)
+   • No configuration matches (wrong SIM or not whitelisted)
+
+📱 What does the notification show?
+   • Title: "No Configuration for SMS"
+   • Content: "From: [number] - [message preview]"
+   • Expanded: Full message text
+   • Action: Tap to open Dashboard and create configuration
+
+💾 Is the SMS still saved?
+   • YES! All SMS are saved to history database
+   • Status will remain PENDING
+   • You can resend later from SMS History
+
+
+MULTIPLE CONFIGURATIONS
+═══════════════════════════════════════════════════════════════════
+
+✨ One SMS can be sent to MULTIPLE servers!
+
+Example scenario:
+   Config A: SIM 1, Autov Server, Whitelist: "192"
+   Config B: SIM 1, Custom Server, No whitelist
+   Config C: SIM 2, Autov Server, No whitelist
+
+   SMS from "192" on SIM 1:
+   ✅ Sent to Config A (matches SIM + whitelist)
+   ✅ Sent to Config B (matches SIM, no whitelist)
+   ❌ NOT sent to Config C (wrong SIM)
+
+   Result: SMS forwarded to 2 different servers!

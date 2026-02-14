@@ -5,6 +5,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.content.Context; // Added
+import android.os.Build;       // Added
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -38,6 +40,15 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     private View btnCloseSearch;
     private String currentDateFilter = null;
     private boolean hasHistory = false;
+    
+    // BroadcastReceiver for SMS status updates
+    private android.content.BroadcastReceiver smsStatusReceiver = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(android.content.Context context, android.content.Intent intent) {
+            // Refresh the list when SMS status is updated
+            loadData();
+        }
+    };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -106,6 +117,14 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             btnClearFilter.setVisibility(View.GONE);
             loadData();
         });
+
+        // Register broadcast receiver for SMS status updates
+        android.content.IntentFilter filter = new android.content.IntentFilter(QueueUploader.ACTION_SMS_STATUS_UPDATED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(smsStatusReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(smsStatusReceiver, filter);
+        }
 
         loadData();
     }
@@ -185,22 +204,36 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
             List<SmsDatabaseHelper.Config> configs = SmsDatabaseHelper.getInstance(this).getAllConfigs();
             int matchCount = 0;
+            
+            // Mark as pending immediately for UI feedback
+            SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(record.id, SmsDatabaseHelper.STATUS_PENDING, "Sending...", null);
+            loadData(); // Refresh UI to show PENDING state
+            
             for (SmsDatabaseHelper.Config config : configs) {
                 if (!config.isActive) continue;
 
-                // Match SIM (0=Both)
-                // For resend, we don't have the detected SIM slot easily, but we have record.simId.
-                // We'll skip complex SIM mapping for now or just send it if config is active.
+                // Match SIM matches...
                 
                 matchCount++;
+                
+                // Update the URL in DB immediately so user sees the new URL in details
+                String targetUrl = config.url;
+                if (config.serverType == 1) {
+                    targetUrl = Const.AUTOV_SMS_UPLOAD;
+                }
+                SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(record.id, SmsDatabaseHelper.STATUS_PENDING, "Sending...", targetUrl);
+                loadData(); // Refresh UI again to show new URL
+                
                 QueueUploader.sendToConfigAsync(this, new JSONObject(payload.toString()), config, "resend-manual");
             }
 
             if (matchCount > 0) {
-                Toast.makeText(this, "Resending to " + matchCount + " configs...", Toast.LENGTH_SHORT).show();
-                recyclerView.postDelayed(this::loadData, 2000);
+                Toast.makeText(this, "Sending...", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "No active configurations found!", Toast.LENGTH_SHORT).show();
+                // Revert status if no configs
+                SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(record.id, SmsDatabaseHelper.STATUS_FAILED, "No active config", null);
+                loadData();
             }
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -212,21 +245,22 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         String url = record.url;
         String resp = record.response;
 
-        // If URL is missing (old records), show the CURRENT configured URL
+        // If URL is missing, it means SMS was NOT forwarded (no configuration matched)
         if (url == null || url.isEmpty()) {
-            android.content.SharedPreferences sp = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE);
-            int server = sp.getInt(Const.PREF_SERVER, 1);
-            if (server == 1) {
-                url = Const.AUTOV_SMS_UPLOAD + " ";
-            } else if (server == 3) {
-                url = sp.getString(Const.PREF_OTHER_URL, "") + " ";
-            } else {
-                url = "Unknown";
+            url = "Not forwarded - No configuration";
+            resp = "This SMS was not sent to any server because:\n" +
+                   "• No configuration existed, OR\n" +
+                   "• All configurations were inactive, OR\n" +
+                   "• No configuration matched (wrong SIM or sender not whitelisted)\n\n" +
+                   "Create or activate a configuration to forward future SMS.";
+        } else {
+            // URL exists, show it
+            if (resp == null || resp.isEmpty()) {
+                resp = "No response data";
             }
         }
-        if (resp == null || resp.isEmpty()) resp = "No response data";
 
-        // Simple formatting
+        // Format the message
         String msg = "URL:\n" + url + "\n\nResponse:\n" + resp;
 
         new MaterialAlertDialogBuilder(this)
@@ -253,7 +287,11 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_clear_history) {
+        if (id == R.id.action_refresh) {
+            loadData();
+            Toast.makeText(this, "Refreshed", Toast.LENGTH_SHORT).show();
+            return true;
+        } else if (id == R.id.action_clear_history) {
             showClearHistoryDialog();
             return true;
         } else if (id == R.id.action_config) {
@@ -261,6 +299,17 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Unregister broadcast receiver to prevent memory leaks
+        try {
+            unregisterReceiver(smsStatusReceiver);
+        } catch (Exception e) {
+            // Receiver might not be registered
+        }
     }
 
     private void showClearHistoryDialog() {

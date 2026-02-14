@@ -230,6 +230,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
                         type = 1;
                         token = etToken.getText().toString().trim();
                         if (token.isEmpty()) { Toast.makeText(this, "Code required", Toast.LENGTH_SHORT).show(); return; }
+                        url = Const.AUTOV_SMS_UPLOAD; // Store the actual server URL
                     }
                     
                     showStep4Whitelist(title, sim, type, url, token);

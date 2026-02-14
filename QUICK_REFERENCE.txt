@@ -1,0 +1,144 @@
+═══════════════════════════════════════════════════════════════════
+                    QUICK REFERENCE GUIDE
+═══════════════════════════════════════════════════════════════════
+
+🎯 WHAT WAS FIXED
+─────────────────────────────────────────────────────────────────
+
+❌ BEFORE:
+   • SMS History showed hardcoded URL even when NOT sent
+   • No clear indication why SMS wasn't forwarded
+   • Confusing for users
+
+✅ NOW:
+   • SMS History shows actual server URL when sent
+   • Shows "No configuration" when NOT sent
+   • Clear notifications explain why SMS wasn't forwarded
+
+
+📱 SMS HISTORY - SERVER DETAILS DIALOG
+─────────────────────────────────────────────────────────────────
+
+SCENARIO 1: SMS WAS FORWARDED
+┌─────────────────────────────────────┐
+│ Server Details                      │
+├─────────────────────────────────────┤
+│ URL:                                │
+│ http://192.168.100.205:8001/api/... │
+│                                     │
+│ Response:                           │
+│ {"status": "success"}               │
+└─────────────────────────────────────┘
+
+SCENARIO 2: SMS NOT FORWARDED (NO CONFIG)
+┌─────────────────────────────────────┐
+│ Server Details                      │
+├─────────────────────────────────────┤
+│ URL:                                │
+│ Not forwarded - No configuration    │
+│                                     │
+│ Response:                           │
+│ This SMS was not sent because:      │
+│ • No configuration existed, OR      │
+│ • All configs were inactive, OR     │
+│ • No config matched (SIM/whitelist) │
+└─────────────────────────────────────┘
+
+
+🔔 NOTIFICATIONS
+─────────────────────────────────────────────────────────────────
+
+1️⃣ NO CONFIGURATION
+   When: No configs exist
+   Title: "No Configuration"
+   Message: "You don't have any configuration"
+
+2️⃣ NO ACTIVE CONFIGURATION
+   When: Configs exist but all OFF
+   Title: "No Active Configuration"
+   Message: "All configurations are turned off"
+
+3️⃣ SMS NOT FORWARDED
+   When: Active configs exist but don't match
+   Title: "SMS Not Forwarded"
+   Message: "No configuration matches this SMS"
+
+
+🔧 KEY CHANGES
+─────────────────────────────────────────────────────────────────
+
+FILE: DashboardActivity.java
+├─ When creating Autov config
+└─ Now stores: url = Const.AUTOV_SMS_UPLOAD
+
+FILE: QueueUploader.java
+├─ When forwarding SMS
+└─ Now uses: config.url (not hardcoded!)
+
+FILE: SmsReceiver.java
+├─ When SMS arrives
+└─ Now shows: 3 different notification types
+
+FILE: SmsHistoryActivity.java
+├─ When showing details
+└─ Now shows: "No configuration" if not sent
+
+
+📋 TESTING CHECKLIST
+─────────────────────────────────────────────────────────────────
+
+□ Test 1: No configuration exists
+  → Notification: "No Configuration"
+  → History: "Not forwarded - No configuration"
+
+□ Test 2: Configuration exists but OFF
+  → Notification: "No Active Configuration"
+  → History: "Not forwarded - No configuration"
+
+□ Test 3: Active configuration matches
+  → No notification
+  → History: Shows actual server URL + response
+
+□ Test 4: Active config but wrong SIM
+  → Notification: "SMS Not Forwarded"
+  → History: "Not forwarded - No configuration"
+
+□ Test 5: Active config but not whitelisted
+  → Notification: "SMS Not Forwarded"
+  → History: "Not forwarded - No configuration"
+
+□ Test 6: Edit configuration
+  → New SMS uses updated settings
+  → History shows updated URL
+
+
+⚠️ IMPORTANT NOTES
+─────────────────────────────────────────────────────────────────
+
+EXISTING CONFIGURATIONS:
+If you have Autov configs created BEFORE this update:
+→ They may have empty URL field
+→ Solution: Edit and re-save each configuration
+
+CHANGING SERVER URL:
+To update Autov server URL:
+1. Update Const.AUTOV_SMS_UPLOAD in Const.java
+2. Edit existing Autov configurations
+3. Or delete and recreate configurations
+
+NO MORE HARDCODED URLS:
+→ App NEVER shows Const.AUTOV_SMS_UPLOAD in history
+→ Only shows it if SMS was actually sent there
+→ Shows "No configuration" if SMS not sent
+
+
+✅ SUMMARY
+─────────────────────────────────────────────────────────────────
+
+✓ Configurations store complete server URL
+✓ SMS forwarding uses config URL only
+✓ History shows accurate information
+✓ Clear notifications for all scenarios
+✓ No more confusing hardcoded URLs
+
+═══════════════════════════════════════════════════════════════════
