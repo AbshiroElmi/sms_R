@@ -306,6 +306,7 @@ public class QueueUploader {
             
             // Notify UI that SMS status was updated
             android.content.Intent intent = new android.content.Intent(ACTION_SMS_STATUS_UPDATED);
+            intent.setPackage(ctx.getPackageName());
             intent.putExtra("sms_id", dbId);
             intent.putExtra("status", status);
             ctx.sendBroadcast(intent);

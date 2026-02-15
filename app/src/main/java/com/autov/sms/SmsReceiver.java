@@ -56,6 +56,7 @@ public class SmsReceiver extends BroadcastReceiver {
             // Notify UI of new SMS immediately
             try {
                 Intent updateIntent = new Intent(QueueUploader.ACTION_SMS_STATUS_UPDATED);
+                updateIntent.setPackage(context.getPackageName());
                 updateIntent.putExtra("sms_id", dbId);
                 updateIntent.putExtra("status", SmsDatabaseHelper.STATUS_PENDING);
                 context.sendBroadcast(updateIntent);
