@@ -13,8 +13,8 @@ android {
         applicationId = "com.autov.sms"
         minSdk = 24
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.0"
+        versionCode = 11
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -51,8 +51,10 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
         }
-        // (optional) sign debug with same keystore:
-        // debug { signingConfig = signingConfigs.getByName("release") }
+        // Use same signature for debug to allow updates from dev builds
+        debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     compileOptions {
