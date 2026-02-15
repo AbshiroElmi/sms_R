@@ -410,6 +410,24 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_sms_history, menu);
+
+        // Change color for Server Config and Check Update to #00B09B
+        int brandColor = android.graphics.Color.parseColor("#00B09B");
+
+        MenuItem configItem = menu.findItem(R.id.action_config);
+        if (configItem != null) {
+            android.text.SpannableString s = new android.text.SpannableString(configItem.getTitle());
+            s.setSpan(new android.text.style.ForegroundColorSpan(brandColor), 0, s.length(), 0);
+            configItem.setTitle(s);
+        }
+
+        MenuItem updateItem = menu.findItem(R.id.action_update);
+        if (updateItem != null) {
+            android.text.SpannableString s = new android.text.SpannableString(updateItem.getTitle());
+            s.setSpan(new android.text.style.ForegroundColorSpan(brandColor), 0, s.length(), 0);
+            updateItem.setTitle(s);
+        }
+
         return true;
     }
 
