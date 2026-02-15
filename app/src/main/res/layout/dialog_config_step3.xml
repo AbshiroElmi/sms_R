@@ -17,6 +17,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="AutoSms Server"
+                android:textColor="@color/black"
                 android:checked="true"
                 android:padding="8dp"/>
 
@@ -25,6 +26,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Other Server"
+                android:textColor="@color/black"
                 android:padding="8dp"/>
         </RadioGroup>
 
@@ -45,6 +47,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:hint="Access Code"
+                    android:textColor="@color/black"
                     android:padding="12dp"
                     android:background="@android:drawable/edit_text"/>
                 <ImageButton
@@ -69,6 +72,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Enter URL"
+                android:textColor="@color/black"
                 android:padding="12dp"
                 android:background="@android:drawable/edit_text"/>
         </LinearLayout>

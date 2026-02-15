@@ -13,6 +13,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="SIM 1"
+            android:textColor="@color/black"
             android:checked="true"
             android:padding="8dp"/>
         <RadioButton
@@ -20,12 +21,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="SIM 2"
+            android:textColor="@color/black"
             android:padding="8dp"/>
         <RadioButton
             android:id="@+id/rbSimBoth"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Both"
+            android:textColor="@color/black"
             android:padding="8dp"/>
     </RadioGroup>
 </LinearLayout>
