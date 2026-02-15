@@ -13,7 +13,7 @@ android {
         applicationId = "com.autov.sms"
         minSdk = 24
         targetSdk = 34
-        versionCode = 11
+        versionCode = 12
         versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
