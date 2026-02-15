@@ -60,6 +60,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
         ).setAppearanceLightStatusBars(false);
 
         super.onCreate(savedInstanceState);
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
         setContentView(R.layout.activity_dashboard);
 
         dbHelper = SmsDatabaseHelper.getInstance(this);

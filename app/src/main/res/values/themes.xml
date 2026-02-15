@@ -35,7 +35,10 @@
         <!-- Removing elevation is the only way to stop the green tint in some M3 versions -->
         <item name="elevation">0dp</item>
         
-        <!-- Button text color -->
+        <!-- Button and Text color -->
         <item name="colorPrimary">@color/colorPrimaryBrand</item>
+        <item name="android:textColorPrimary">@color/black</item>
+        <item name="android:textColorSecondary">@color/grey_text</item>
+        <item name="colorOnSurface">@color/black</item>
     </style>
 </resources>
