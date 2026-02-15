@@ -294,13 +294,21 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             android.net.Uri downloadUri = manager.getUriForDownloadedFile(id);
             
             if (downloadUri != null) {
+                // Check if we have permission to install apps (Android 8+)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (!getPackageManager().canRequestPackageInstalls()) {
+                        Toast.makeText(this, "Please allow 'Install unknown apps' for this app.", Toast.LENGTH_LONG).show();
+                        startActivity(new android.content.Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                                .setData(android.net.Uri.parse("package:" + getPackageName())));
+                        return;
+                    }
+                }
+
                 android.content.Intent install = new android.content.Intent(android.content.Intent.ACTION_VIEW);
                 install.setDataAndType(downloadUri, "application/vnd.android.package-archive");
                 install.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
                 install.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 
-                // For modern Android, we use the URI directly from DownloadManager
-                // It already provides a content:// URI that is safe for the installer
                 startActivity(install);
             } else {
                 Toast.makeText(this, "Could not find downloaded file.", Toast.LENGTH_SHORT).show();
