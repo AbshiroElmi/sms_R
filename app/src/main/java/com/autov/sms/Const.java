@@ -22,7 +22,7 @@ public final class Const {
 
     // Your default Autov SMS endpoint (if used)
     public static final String AUTOV_SMS_UPLOAD = AUTOVSERVER+"/api/method/autov.api.sms_upload";
-    public static final String AUTOV_UPDATE_CHECK = "https://raw.githubusercontent.com/AbshiroElmi/sms_R/main/updates/update.json";
+    public static final String AUTOV_UPDATE_CHECK = "https://raw.githubusercontent.com/AbshiroElmi/sms_R/refs/heads/added-downloading/updates/update.json";
 
     public static String verifyUrl(String token) {
         return AUTOVSERVER+"/api/method/autov.api.verify_token?token=" + token;
