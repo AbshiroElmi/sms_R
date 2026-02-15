@@ -13,9 +13,13 @@ android {
         applicationId = "com.autov.sms"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
+        versionCode = 6
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     // --- Load keystore props (from app/keystore.properties) ---

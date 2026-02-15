@@ -16,4 +16,9 @@
         android:title="Clear All"
         android:icon="@drawable/ic_delete_white"
         app:showAsAction="always" />
+    <item
+        android:id="@+id/action_update"
+        android:title="Check Update"
+        android:icon="@drawable/ic_download_white"
+        app:showAsAction="ifRoom" />
 </menu>

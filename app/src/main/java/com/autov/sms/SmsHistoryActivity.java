@@ -61,6 +61,16 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
         setContentView(R.layout.activity_sms_history);
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= 33) {
+                 registerReceiver(downloadReceiver, new android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE), Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                 registerReceiver(downloadReceiver, new android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+            }
+        } else {
+             registerReceiver(downloadReceiver, new android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        }
+        
         MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
@@ -145,7 +155,8 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
         datePicker.show(getSupportFragmentManager(), "DATE_PICKER");
     }
-
+    
+    // Existing loadData
     private void loadData() {
         List<SmsAdapter.SmsRecord> records = new ArrayList<>();
         String searchText = etSearch != null ? etSearch.getText().toString() : null;
@@ -178,6 +189,125 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         } else {
             recyclerView.setVisibility(View.VISIBLE);
             emptyState.setVisibility(View.GONE);
+        }
+    }
+
+    // Update logic
+    private boolean updateAvailable = false;
+    private String updateUrl = null;
+    private long downloadId = -1;
+
+    // Download Complete Receiver
+    private final android.content.BroadcastReceiver downloadReceiver = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, android.content.Intent intent) {
+            long id = intent.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+            if (id == downloadId) {
+                installApk(id);
+            }
+        }
+    };
+
+    private void checkForUpdate() {
+        Toast.makeText(this, "Checking for updates...", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                // Standard HTTP GET
+                java.net.URL url = new java.net.URL(Const.AUTOV_UPDATE_CHECK);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setConnectTimeout(10000);
+                conn.setRequestMethod("GET");
+                
+                if (conn.getResponseCode() == 200) {
+                    java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream()));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) sb.append(line);
+                    br.close();
+                    
+                    JSONObject data = new JSONObject(sb.toString());
+                    
+                    int remoteVer = data.optInt("version_code", -1);
+                    String remoteUrl = data.optString("download_url", "");
+                    
+                    int currentVer = BuildConfig.VERSION_CODE;
+                    
+                    if (remoteVer > currentVer && !remoteUrl.isEmpty()) {
+                        runOnUiThread(() -> {
+                            updateAvailable = true;
+                            updateUrl = remoteUrl;
+                            showUpdateConfirmation(remoteVer, remoteUrl);
+                        });
+                    } else {
+                        runOnUiThread(() -> {
+                            Toast.makeText(SmsHistoryActivity.this, "Already up to date (V" + currentVer + "). Server has V" + remoteVer, Toast.LENGTH_LONG).show();
+                        });
+                    }
+                } else {
+                    int code = conn.getResponseCode();
+                    runOnUiThread(() -> {
+                        Toast.makeText(SmsHistoryActivity.this, "Server Error: " + code + ". Check if update.json exists.", Toast.LENGTH_LONG).show();
+                    });
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> {
+                    Toast.makeText(SmsHistoryActivity.this, "Check failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
+    }
+
+    private void showUpdateConfirmation(int version, String url) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Update Available")
+                .setMessage("A new version (" + version + ") is available. Download and install now?")
+                .setPositiveButton("Download", (dialog, which) -> startDownload())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void startDownload() {
+        if (updateUrl == null) return;
+        try {
+            android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(android.net.Uri.parse(updateUrl));
+            request.setAllowedNetworkTypes(android.app.DownloadManager.Request.NETWORK_WIFI | android.app.DownloadManager.Request.NETWORK_MOBILE);
+            request.setTitle("Downloading Update");
+            request.setDescription("Downloading latest version...");
+            request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, "sms_update.apk");
+            request.setMimeType("application/vnd.android.package-archive");
+
+            android.app.DownloadManager manager = (android.app.DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            if (manager != null) {
+                downloadId = manager.enqueue(request);
+                Toast.makeText(this, "Downloading...", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Download failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void installApk(long id) {
+        try {
+            android.app.DownloadManager manager = (android.app.DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            android.net.Uri downloadUri = manager.getUriForDownloadedFile(id);
+            
+            if (downloadUri != null) {
+                android.content.Intent install = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                install.setDataAndType(downloadUri, "application/vnd.android.package-archive");
+                install.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                install.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                
+                // For modern Android, we use the URI directly from DownloadManager
+                // It already provides a content:// URI that is safe for the installer
+                startActivity(install);
+            } else {
+                Toast.makeText(this, "Could not find downloaded file.", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Install failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -297,6 +427,9 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         } else if (id == R.id.action_config) {
             startActivity(new android.content.Intent(this, DashboardActivity.class));
             return true;
+        } else if (id == R.id.action_update) {
+            checkForUpdate();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -307,6 +440,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         // Unregister broadcast receiver to prevent memory leaks
         try {
             unregisterReceiver(smsStatusReceiver);
+            unregisterReceiver(downloadReceiver);
         } catch (Exception e) {
             // Receiver might not be registered
         }
