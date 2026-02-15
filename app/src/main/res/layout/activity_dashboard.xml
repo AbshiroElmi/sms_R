@@ -60,7 +60,7 @@
                     android:text="No Configurations"
                     android:textSize="20sp"
                     android:textStyle="bold"
-                    android:textColor="#374151"/>
+                    android:textColor="@color/black"/>
 
                 <TextView
                     android:layout_width="wrap_content"
