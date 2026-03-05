@@ -81,11 +81,11 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
         findViewById(R.id.btnCreateConfig).setOnClickListener(v -> {
             currentEditing = null;
-            showStep1Title();
+            showStep0Type();
         });
         fabAdd.setOnClickListener(v -> {
             currentEditing = null;
-            showStep1Title();
+            showStep0Type();
         });
 
         QueueUploader.ensureBaselineNow(this);
@@ -100,6 +100,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
         List<String> missing = new ArrayList<>();
         addIfMissing(missing, Manifest.permission.RECEIVE_SMS);
         addIfMissing(missing, Manifest.permission.READ_SMS);
+        addIfMissing(missing, Manifest.permission.SEND_SMS);
         addIfMissing(missing, Manifest.permission.READ_PHONE_STATE);
         addIfMissing(missing, Manifest.permission.READ_PHONE_NUMBERS);
         addIfMissing(missing, Manifest.permission.CAMERA);
@@ -145,7 +146,22 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
 
     // --- Dialog Flow ---
 
-    private void showStep1Title() {
+    private void showStep0Type() {
+        View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step0, null);
+        RadioGroup rg = view.findViewById(R.id.rgConfigType);
+        
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Select Configuration Type")
+                .setView(view)
+                .setPositiveButton("Next", (dialog, which) -> {
+                    int configType = rg.getCheckedRadioButtonId() == R.id.rbOutgoing ? 1 : 0;
+                    showStep1Title(configType);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showStep1Title(int configType) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step1, null);
         EditText et = view.findViewById(R.id.etConfigTitle);
         if (currentEditing != null) et.setText(currentEditing.title);
@@ -156,13 +172,15 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
                 .setPositiveButton("Next", (dialog, which) -> {
                     String title = et.getText().toString().trim();
                     if (title.isEmpty()) title = "Filter1";
-                    showStep2Sim(title);
+                    showStep2Sim(title, configType);
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton("Back", (dialog, which) -> {
+                    if (currentEditing == null) showStep0Type();
+                })
                 .show();
     }
 
-    private void showStep2Sim(String title) {
+    private void showStep2Sim(String title, int configType) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step2, null);
         RadioGroup rg = view.findViewById(R.id.rgSim);
         if (currentEditing != null) {
@@ -179,13 +197,14 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
                     int sim = 1;
                     if (id == R.id.rbSim2) sim = 2;
                     else if (id == R.id.rbSimBoth) sim = 0;
-                    showStep3Server(title, sim);
+                    
+                    showStep3Server(title, sim, configType);
                 })
-                .setNegativeButton("Back", (dialog, which) -> showStep1Title())
+                .setNegativeButton("Back", (dialog, which) -> showStep1Title(configType))
                 .show();
     }
 
-    private void showStep3Server(String title, int sim) {
+    private void showStep3Server(String title, int sim, int configType) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step3, null);
         RadioGroup rg = view.findViewById(R.id.rgServers);
         View formAutov = view.findViewById(R.id.formAutov);
@@ -216,7 +235,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Server Configuration")
                 .setView(view)
-                .setPositiveButton("Next", (dialog, which) -> {
+                .setPositiveButton(configType == 1 ? "Finish" : "Next", (dialog, which) -> {
                     int id = rg.getCheckedRadioButtonId();
                     int type = 1; 
                     String url = "";
@@ -233,13 +252,24 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
                         url = Const.AUTOV_SMS_UPLOAD; // Store the actual server URL
                     }
                     
-                    showStep4Whitelist(title, sim, type, url, token);
+                    if (configType == 1) { // Outgoing flow ends here (skips whitelist)
+                        if (currentEditing == null) {
+                            dbHelper.addConfig(configType, title, sim, type, url, token, "", true);
+                            Toast.makeText(this, "Configuration created", Toast.LENGTH_SHORT).show();
+                        } else {
+                            dbHelper.updateConfig(currentEditing.id, configType, title, sim, type, url, token, "");
+                            Toast.makeText(this, "Configuration updated", Toast.LENGTH_SHORT).show();
+                        }
+                        refreshList();
+                    } else {
+                        showStep4Whitelist(title, sim, configType, type, url, token);
+                    }
                 })
-                .setNegativeButton("Back", (dialog, which) -> showStep2Sim(title))
+                .setNegativeButton("Back", (dialog, which) -> showStep2Sim(title, configType))
                 .show();
     }
 
-    private void showStep4Whitelist(String title, int sim, int type, String url, String token) {
+    private void showStep4Whitelist(String title, int sim, int configType, int type, String url, String token) {
         View view = LayoutInflater.from(this).inflate(R.layout.dialog_config_step4, null);
         EditText et = view.findViewById(R.id.etWhitelist);
         if (currentEditing != null) et.setText(currentEditing.whitelist);
@@ -250,15 +280,15 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
                 .setPositiveButton("Finish", (dialog, which) -> {
                     String whitelist = et.getText().toString().trim();
                     if (currentEditing == null) {
-                        dbHelper.addConfig(title, sim, type, url, token, whitelist, true);
+                        dbHelper.addConfig(configType, title, sim, type, url, token, whitelist, true);
                         Toast.makeText(this, "Configuration created", Toast.LENGTH_SHORT).show();
                     } else {
-                        dbHelper.updateConfig(currentEditing.id, title, sim, type, url, token, whitelist);
+                        dbHelper.updateConfig(currentEditing.id, configType, title, sim, type, url, token, whitelist);
                         Toast.makeText(this, "Configuration updated", Toast.LENGTH_SHORT).show();
                     }
                     refreshList();
                 })
-                .setNegativeButton("Back", (dialog, which) -> showStep3Server(title, sim))
+                .setNegativeButton("Back", (dialog, which) -> showStep3Server(title, sim, configType))
                 .show();
     }
 
@@ -273,7 +303,7 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
     @Override
     public void onEdit(SmsDatabaseHelper.Config config) {
         currentEditing = config;
-        showStep1Title();
+        showStep1Title(config.configType);
     }
 
     @Override

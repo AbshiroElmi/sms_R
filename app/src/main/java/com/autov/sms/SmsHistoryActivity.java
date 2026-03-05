@@ -29,6 +29,21 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import android.telephony.SmsManager;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
+import android.widget.EditText;
+import android.view.LayoutInflater;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.content.ContextCompat;
+import androidx.core.app.ActivityCompat;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.OnResendClickListener {
 
     private RecyclerView recyclerView;
@@ -126,6 +141,9 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             registerReceiver(smsStatusReceiver, filter);
         }
 
+        // Start outgoing SMS poller
+        OutgoingSmsPoller.start(this);
+
         loadData();
     }
 
@@ -183,6 +201,16 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
     @Override
     public void onResendClick(SmsAdapter.SmsRecord record) {
+        if (record.from != null && record.from.startsWith("To:")) {
+            pendingSmsRecordToForward = record;
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.SEND_SMS}, 102);
+            } else {
+                resendOutgoingSms(record);
+            }
+            return;
+        }
+
         try {
             String deviceId = DeviceIdUtil.get(this);
             SimInfoUtil.SimInfo si = SimInfoUtil.read(this, record.simId);
@@ -310,6 +338,8 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         } catch (Exception e) {
             // Receiver might not be registered
         }
+        
+        OutgoingSmsPoller.stop();
     }
 
     private void showClearHistoryDialog() {
@@ -323,5 +353,113 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private SmsAdapter.SmsRecord pendingSmsRecordToForward = null;
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @androidx.annotation.NonNull String[] permissions, @androidx.annotation.NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 102) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (pendingSmsRecordToForward != null) {
+                    resendOutgoingSms(pendingSmsRecordToForward);
+                }
+            } else {
+                Toast.makeText(this, "Permission denied to send SMS", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void resendOutgoingSms(SmsAdapter.SmsRecord record) {
+        String phone = record.from.replaceFirst("^To:\\s*", "").trim();
+        int subId = -1;
+
+        try {
+            SubscriptionManager sm = SubscriptionManager.from(this);
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                List<SubscriptionInfo> activeSims = sm.getActiveSubscriptionInfoList();
+                if (activeSims != null) {
+                    for (int i = 0; i < activeSims.size(); i++) {
+                        SubscriptionInfo info = activeSims.get(i);
+                        if (record.simIndex == 1 && info.getSimSlotIndex() == 0) subId = info.getSubscriptionId();
+                        if (record.simIndex == 2 && info.getSimSlotIndex() == 1) subId = info.getSubscriptionId();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        Toast.makeText(this, "Resending SMS...", Toast.LENGTH_SHORT).show();
+        sendSms(subId, phone, record.body, record.simIndex, record.id);
+    }
+
+    private void sendSms(int subId, String phone, String msg, int simIndex, long dbId) {
+        // Record in Database
+        SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(dbId, SmsDatabaseHelper.STATUS_PENDING, "Sending...", null);
+        loadData();
+
+        // Physical SMS sending logic
+        boolean hardwareSuccess = true;
+        try {
+            SmsManager smsManager;
+            if (subId != -1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                smsManager = SmsManager.getSmsManagerForSubscriptionId(subId);
+            } else {
+                smsManager = SmsManager.getDefault();
+            }
+            if (smsManager != null) {
+                smsManager.sendTextMessage(phone, null, msg, null, null);
+                Toast.makeText(this, "SMS Sent", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Could not find SMS Manager", Toast.LENGTH_SHORT).show();
+                hardwareSuccess = false;
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Failed to send SMS: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            hardwareSuccess = false;
+        }
+
+        final boolean finalHardwareSuccess = hardwareSuccess;
+
+        // POST to Webhook.site
+        new Thread(() -> {
+            boolean success = false;
+            String webhookResponse = "";
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("action", "send_sms");
+                payload.put("to", phone);
+                payload.put("message", msg);
+                payload.put("sim_id", subId);
+                payload.put("sim_index", simIndex);
+
+                URL url = new URL("https://webhook.site/e7e25a18-8de6-4881-8708-53f08cdf4410");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                conn.setDoOutput(true);
+
+                byte[] out = payload.toString().getBytes("UTF-8");
+                OutputStream os = conn.getOutputStream();
+                os.write(out);
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                webhookResponse = "HTTP " + responseCode;
+                success = (responseCode >= 200 && responseCode < 300);
+                android.util.Log.d("SendSMS", "Webhook POST response: " + responseCode);
+                conn.disconnect();
+            } catch (Exception e) {
+                e.printStackTrace();
+                webhookResponse = "Error: " + e.getMessage();
+            }
+            
+            int finalStatus = (success && finalHardwareSuccess) ? SmsDatabaseHelper.STATUS_SENT : SmsDatabaseHelper.STATUS_FAILED;
+            SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(dbId, finalStatus, webhookResponse, "https://webhook.site/e7e25a18-8de6-4881-8708-53f08cdf4410");
+            runOnUiThread(this::loadData);
+        }).start();
     }
 }

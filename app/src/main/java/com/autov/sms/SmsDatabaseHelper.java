@@ -11,8 +11,7 @@ import java.util.List;
 
 public class SmsDatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "sms_history.db";
-    private static final int DATABASE_VERSION = 7;
-
+    private static final int DATABASE_VERSION = 8;
     public static final String TABLE_SMS = "sms_history";
     public static final String COLUMN_ID = "id";
     public static final String COLUMN_FROM = "from_number";
@@ -31,6 +30,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
 
     public static final String TABLE_CONFIG = "configurations";
     public static final String COL_CONFIG_id = "_id";
+    public static final String COL_CONFIG_TYPE = "config_type"; // 0=Incoming, 1=Outgoing
     public static final String COL_CONFIG_TITLE = "title";
     public static final String COL_CONFIG_SIM = "sim_index"; // 0=Both, 1=Sim1, 2=Sim2
     public static final String COL_CONFIG_SERVER_TYPE = "server_type"; // 1=Autov, 3=Other
@@ -69,6 +69,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
 
         String createConfigTable = "CREATE TABLE " + TABLE_CONFIG + " (" +
                 COL_CONFIG_id + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_CONFIG_TYPE + " INTEGER DEFAULT 0, " +
                 COL_CONFIG_TITLE + " TEXT, " +
                 COL_CONFIG_SIM + " INTEGER, " +
                 COL_CONFIG_SERVER_TYPE + " INTEGER, " +
@@ -97,6 +98,9 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         }
         if (oldVersion < 7) {
             try { db.execSQL("ALTER TABLE " + TABLE_SMS + " ADD COLUMN " + COLUMN_SIM_INDEX + " INTEGER"); } catch(Exception e){}
+        }
+        if (oldVersion < 8) {
+            try { db.execSQL("ALTER TABLE " + TABLE_CONFIG + " ADD COLUMN " + COL_CONFIG_TYPE + " INTEGER DEFAULT 0"); } catch(Exception e){}
         }
     }
 
@@ -147,9 +151,10 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // Config Methods
-    public long addConfig(String title, int sim, int serverType, String url, String token, String whitelist, boolean isActive) {
+    public long addConfig(int configType, String title, int sim, int serverType, String url, String token, String whitelist, boolean isActive) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues cv = new ContentValues();
+        cv.put(COL_CONFIG_TYPE, configType);
         cv.put(COL_CONFIG_TITLE, title);
         cv.put(COL_CONFIG_SIM, sim);
         cv.put(COL_CONFIG_SERVER_TYPE, serverType);
@@ -167,9 +172,10 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         db.update(TABLE_CONFIG, cv, COL_CONFIG_id + "=?", new String[]{String.valueOf(id)});
     }
 
-    public void updateConfig(long id, String title, int sim, int serverType, String url, String token, String whitelist) {
+    public void updateConfig(long id, int configType, String title, int sim, int serverType, String url, String token, String whitelist) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues cv = new ContentValues();
+        cv.put(COL_CONFIG_TYPE, configType);
         cv.put(COL_CONFIG_TITLE, title);
         cv.put(COL_CONFIG_SIM, sim);
         cv.put(COL_CONFIG_SERVER_TYPE, serverType);
@@ -191,6 +197,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
              while(c.moveToNext()) {
                  list.add(new Config(
                      c.getLong(c.getColumnIndexOrThrow(COL_CONFIG_id)),
+                     c.getInt(c.getColumnIndexOrThrow(COL_CONFIG_TYPE)),
                      c.getString(c.getColumnIndexOrThrow(COL_CONFIG_TITLE)),
                      c.getInt(c.getColumnIndexOrThrow(COL_CONFIG_SIM)),
                      c.getInt(c.getColumnIndexOrThrow(COL_CONFIG_SERVER_TYPE)),
@@ -207,6 +214,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
 
     public static class Config {
         public long id;
+        public int configType;
         public String title;
         public int simIndex;
         public int serverType;
@@ -214,8 +222,8 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         public String token;
         public String whitelist;
         public boolean isActive;
-        public Config(long id, String t, int sim, int st, String u, String tok, String wl, boolean act) {
-            this.id = id; title=t; simIndex=sim; serverType=st; url=u; token=tok; whitelist=wl; isActive=act;
+        public Config(long id, int cType, String t, int sim, int st, String u, String tok, String wl, boolean act) {
+            this.id = id; configType=cType; title=t; simIndex=sim; serverType=st; url=u; token=tok; whitelist=wl; isActive=act;
         }
     }
 }

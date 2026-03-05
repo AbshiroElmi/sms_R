@@ -44,7 +44,11 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         SmsRecord record = items.get(position);
-        holder.tvFrom.setText("From: " + record.from);
+        if (record.from != null && record.from.startsWith("To:")) {
+            holder.tvFrom.setText(record.from);
+        } else {
+            holder.tvFrom.setText("From: " + record.from);
+        }
         holder.tvBody.setText(record.body);
         holder.tvTime.setText(record.isoDate);
 

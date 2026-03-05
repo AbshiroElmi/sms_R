@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+    <RadioGroup
+        android:id="@+id/rgConfigType"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <RadioButton
+            android:id="@+id/rbIncoming"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Incoming"
+            android:checked="true"
+            android:padding="8dp"/>
+        <RadioButton
+            android:id="@+id/rbOutgoing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Outgoing"
+            android:padding="8dp"/>
+    </RadioGroup>
+</LinearLayout>

@@ -16,7 +16,7 @@
                 android:id="@+id/rbAutov"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="AutoSms Server"
+                android:text="Server"
                 android:checked="true"
                 android:padding="8dp"/>
 
@@ -24,7 +24,7 @@
                 android:id="@+id/rbOther"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Other Server"
+                android:text="Custom Server"
                 android:padding="8dp"/>
         </RadioGroup>
 
