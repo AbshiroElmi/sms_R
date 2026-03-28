@@ -297,7 +297,12 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         }
 
         // Format the message
-        String msg = "URL:\n" + url + "\n\nResponse:\n" + resp;
+        String msg;
+        if (url.equals(Const.AUTOV_SMS_UPLOAD)) {
+            msg = "Response:\n" + resp;
+        } else {
+            msg = "URL:\n" + url + "\n\nResponse:\n" + resp;
+        }
 
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Server Details")
