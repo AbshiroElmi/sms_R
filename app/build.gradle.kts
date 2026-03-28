@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.zxing.embedded)
     implementation(libs.zxing.core)
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

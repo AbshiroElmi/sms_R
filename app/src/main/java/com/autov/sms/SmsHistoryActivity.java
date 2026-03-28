@@ -55,6 +55,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     private View btnCloseSearch;
     private String currentDateFilter = null;
     private boolean hasHistory = false;
+    private androidx.swiperefreshlayout.widget.SwipeRefreshLayout swipeRefreshLayout;
     
     // BroadcastReceiver for SMS status updates
     private android.content.BroadcastReceiver smsStatusReceiver = new android.content.BroadcastReceiver() {
@@ -86,6 +87,13 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new SmsAdapter(this);
         recyclerView.setAdapter(adapter);
+
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout);
+        swipeRefreshLayout.setColorSchemeColors(android.graphics.Color.parseColor("#00B09B"));
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            loadData();
+            swipeRefreshLayout.setRefreshing(false);
+        });
 
         tvDateFilter = findViewById(R.id.tvDateFilter);
         btnSearch = findViewById(R.id.btnSearch);
@@ -315,11 +323,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_refresh) {
-            loadData();
-            Toast.makeText(this, "Refreshed", Toast.LENGTH_SHORT).show();
-            return true;
-        } else if (id == R.id.action_clear_history) {
+        if (id == R.id.action_clear_history) {
             showClearHistoryDialog();
             return true;
         } else if (id == R.id.action_config) {

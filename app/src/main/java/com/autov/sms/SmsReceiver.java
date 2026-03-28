@@ -156,9 +156,29 @@ public class SmsReceiver extends BroadcastReceiver {
             String maskedNumber = SimInfoUtil.maskNumber(si.phoneNumber);
             String deviceId = DeviceIdUtil.get(context);
             
+            // Get battery info
+            int batteryLevel = -1;
+            boolean isCharging = false;
+            try {
+                android.content.IntentFilter ifilter = new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED);
+                android.content.Intent batteryStatus = context.registerReceiver(null, ifilter);
+                if (batteryStatus != null) {
+                    int level = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+                    if (level != -1 && scale != -1) {
+                        batteryLevel = (int) ((level / (float) scale) * 100);
+                    }
+                    int status = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+                    isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                                 status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+                }
+            } catch (Exception ignore) {}
+            
             JSONObject payload = new JSONObject()
                     .put("type", "incoming_new")
                     .put("device_unique_id", deviceId)
+                    .put("battery_level", batteryLevel)
+                    .put("is_charging", isCharging)
                     .put("from", fromNumber)
                     .put("body", sanitizeBody(body.toString()))
                     .put("sim_id", subId)
