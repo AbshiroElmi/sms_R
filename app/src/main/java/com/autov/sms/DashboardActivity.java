@@ -92,6 +92,16 @@ public class DashboardActivity extends AppCompatActivity implements ConfigAdapte
         initPerms();
         maybeAskIgnoreBatteryOptimizations();
 
+        android.widget.TextView tvAppVersion = findViewById(R.id.tvAppVersion);
+        if (tvAppVersion != null) {
+            try {
+                String versionName = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+                tvAppVersion.setText("Version " + versionName);
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                tvAppVersion.setText("Version Unknown");
+            }
+        }
+
         refreshList();
         QueueUploader.flushQueueIfAnyAsync(this);
     }

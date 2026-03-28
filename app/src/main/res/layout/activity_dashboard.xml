@@ -27,7 +27,8 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
             <!-- List of configs -->
             <androidx.recyclerview.widget.RecyclerView
@@ -96,6 +97,16 @@
                 app:tint="@android:color/white"
                 android:visibility="gone"/>
         </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvAppVersion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:textSize="12sp"
+            android:textColor="#9CA3AF" />
 
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
