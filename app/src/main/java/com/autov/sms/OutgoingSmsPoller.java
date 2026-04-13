@@ -102,7 +102,7 @@ public class OutgoingSmsPoller {
                         processed.add(msgId);
                         globalUpdatedSet = true;
                         
-                        db.insertSms("To: " + to, body, System.currentTimeMillis(), SmsDatabaseHelper.STATUS_SENT, -1, simReq, Iso.now());
+                        db.insertSms("To: " + to, body, System.currentTimeMillis(), SmsDatabaseHelper.STATUS_SENT, -1, simReq, Iso.now(), c.token);
                         
                         // Notify UI
                         android.content.Intent intent = new android.content.Intent(QueueUploader.ACTION_SMS_STATUS_UPDATED);

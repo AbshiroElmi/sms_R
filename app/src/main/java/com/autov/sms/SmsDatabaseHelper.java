@@ -11,7 +11,7 @@ import java.util.List;
 
 public class SmsDatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "sms_history.db";
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 9;
     public static final String TABLE_SMS = "sms_history";
     public static final String COLUMN_ID = "id";
     public static final String COLUMN_FROM = "from_number";
@@ -23,6 +23,7 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_ISO_DATE = "iso_date";
     public static final String COLUMN_RESPONSE = "response_data";
     public static final String COLUMN_URL = "req_url";
+    public static final String COLUMN_TOKEN = "auth_token";
 
     public static final int STATUS_PENDING = 0;
     public static final int STATUS_SENT = 1;
@@ -64,7 +65,8 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_SIM_INDEX + " INTEGER, " +
                 COLUMN_ISO_DATE + " TEXT, " +
                 COLUMN_RESPONSE + " TEXT, " +
-                COLUMN_URL + " TEXT)";
+                COLUMN_URL + " TEXT, " +
+                COLUMN_TOKEN + " TEXT)";
         db.execSQL(createTable);
 
         String createConfigTable = "CREATE TABLE " + TABLE_CONFIG + " (" +
@@ -102,9 +104,12 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         if (oldVersion < 8) {
             try { db.execSQL("ALTER TABLE " + TABLE_CONFIG + " ADD COLUMN " + COL_CONFIG_TYPE + " INTEGER DEFAULT 0"); } catch(Exception e){}
         }
+        if (oldVersion < 9) {
+            try { db.execSQL("ALTER TABLE " + TABLE_SMS + " ADD COLUMN " + COLUMN_TOKEN + " TEXT"); } catch(Exception e){}
+        }
     }
 
-    public long insertSms(String from, String body, long timestamp, int status, int simId, int simIndex, String isoDate) {
+    public long insertSms(String from, String body, long timestamp, int status, int simId, int simIndex, String isoDate, String token) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(COLUMN_FROM, from);
@@ -114,16 +119,22 @@ public class SmsDatabaseHelper extends SQLiteOpenHelper {
         values.put(COLUMN_SIM_ID, simId);
         values.put(COLUMN_SIM_INDEX, simIndex);
         values.put(COLUMN_ISO_DATE, isoDate);
+        if (token != null) values.put(COLUMN_TOKEN, token);
         return db.insert(TABLE_SMS, null, values);
     }
 
-    public void updateStatusResponseAndUrl(long id, int status, String response, String url) {
+    public void updateStatusResponseUrlAndToken(long id, int status, String response, String url, String token) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(COLUMN_STATUS, status);
         if (response != null) values.put(COLUMN_RESPONSE, response);
         if (url != null) values.put(COLUMN_URL, url);
+        if (token != null) values.put(COLUMN_TOKEN, token);
         db.update(TABLE_SMS, values, COLUMN_ID + "=?", new String[]{String.valueOf(id)});
+    }
+
+    public void updateStatusResponseAndUrl(long id, int status, String response, String url) {
+        updateStatusResponseUrlAndToken(id, status, response, url, null);
     }
 
     public Cursor getAllSmsCursor(String dateFilter, String searchText) {

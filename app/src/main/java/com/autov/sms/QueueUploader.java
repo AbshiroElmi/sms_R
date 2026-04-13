@@ -168,19 +168,23 @@ public class QueueUploader {
                 return;
             }
 
+            if (config.token != null && !config.token.isEmpty()) {
+                payload.put("token", config.token);
+            }
+
             // Note: We might want a separate queue per config, but for now we'll just try to send
             ResponseData res = postJson(endpoint, payload, source, null, token);
 
             if (res.code >= 200 && res.code < 300) {
                 Log.d(TAG, "✅ sent status=" + res.code);
-                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint, config.token);
             } else {
                 Log.d(TAG, "❌ server status=" + res.code);
                 // Include HTTP code in the failure reason
                 String reason = "HTTP " + res.code;
                 if (res.body != null && !res.body.isEmpty()) reason += "\n" + res.body;
                 
-                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, reason, endpoint);
+                updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, reason, endpoint, config.token);
                 // Simple enqueue for now (global queue)
                 enqueueOffline(ctx, payload);
             }
@@ -191,7 +195,7 @@ public class QueueUploader {
             if (e instanceof java.net.UnknownHostException) errorMsg = "Unknown Host (Check URL)";
             if (e instanceof java.net.ConnectException) errorMsg = "Connection Refused (Server Down?)";
             
-            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, errorMsg, config.url);
+            updateDbStatus(ctx, payload, SmsDatabaseHelper.STATUS_FAILED, errorMsg, config.url, config.token);
             enqueueOffline(ctx, payload);
         }
     }
@@ -232,12 +236,18 @@ public class QueueUploader {
 
                     try {
                         String queuedAt = item.optString("_queuedAt", "");
-                        ResponseData res = postJson(endpoint, item, "flush", queuedAt, config.token);
+                        
+                        JSONObject payloadToSend = new JSONObject(item.toString());
+                        if (config.token != null && !config.token.isEmpty()) {
+                            payloadToSend.put("token", config.token);
+                        }
+
+                        ResponseData res = postJson(endpoint, payloadToSend, "flush", queuedAt, config.token);
                         if (res.code >= 200 && res.code < 300) {
-                            updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint);
+                            updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_SENT, res.body, endpoint, config.token);
                             sentAny = true;
                         } else {
-                            updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint);
+                            updateDbStatus(ctx, item, SmsDatabaseHelper.STATUS_FAILED, res.body, endpoint, config.token);
                         }
                     } catch (Exception ignore) {}
                 }
@@ -299,10 +309,10 @@ public class QueueUploader {
             conn.disconnect();
         }
     }
-    private static void updateDbStatus(Context ctx, JSONObject payload, int status, @Nullable String response, @Nullable String url) {
+    private static void updateDbStatus(Context ctx, JSONObject payload, int status, @Nullable String response, @Nullable String url, @Nullable String token) {
         long dbId = payload.optLong("_db_id", -1);
         if (dbId != -1) {
-            SmsDatabaseHelper.getInstance(ctx).updateStatusResponseAndUrl(dbId, status, response, url);
+            SmsDatabaseHelper.getInstance(ctx).updateStatusResponseUrlAndToken(dbId, status, response, url, token);
             
             // Notify UI that SMS status was updated
             android.content.Intent intent = new android.content.Intent(ACTION_SMS_STATUS_UPDATED);

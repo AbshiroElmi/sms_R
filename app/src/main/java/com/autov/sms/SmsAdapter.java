@@ -128,8 +128,9 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
         String isoDate;
         String response;
         String url;
+        String token;
 
-        public SmsRecord(long id, String from, String body, long timestamp, int status, int simId, int simIndex, String isoDate, String response, String url) {
+        public SmsRecord(long id, String from, String body, long timestamp, int status, int simId, int simIndex, String isoDate, String response, String url, String token) {
             this.id = id;
             this.from = from;
             this.body = body;
@@ -140,6 +141,7 @@ public class SmsAdapter extends RecyclerView.Adapter<SmsAdapter.ViewHolder> {
             this.isoDate = isoDate;
             this.response = response;
             this.url = url;
+            this.token = token;
         }
     }
 }

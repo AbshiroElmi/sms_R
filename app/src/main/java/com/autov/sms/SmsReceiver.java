@@ -49,7 +49,7 @@ public class SmsReceiver extends BroadcastReceiver {
 
             // Save to History Database once
             long dbId = SmsDatabaseHelper.getInstance(context).insertSms(
-                    fromNumber, body, ts, SmsDatabaseHelper.STATUS_PENDING, subId, simIndex, isoDate
+                    fromNumber, body, ts, SmsDatabaseHelper.STATUS_PENDING, subId, simIndex, isoDate, null
             );
             payloadBase.put("_db_id", dbId);
 
