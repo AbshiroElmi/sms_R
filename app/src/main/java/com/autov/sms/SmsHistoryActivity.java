@@ -189,7 +189,8 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                         cursor.getInt(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_SIM_INDEX)),
                         cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_ISO_DATE)),
                         cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_RESPONSE)),
-                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_URL))
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_URL)),
+                        cursor.getString(cursor.getColumnIndexOrThrow(SmsDatabaseHelper.COLUMN_TOKEN))
                 ));
             }
             cursor.close();
@@ -227,9 +228,28 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             int configuredSimIndex = getSharedPreferences(Const.PREF_NAME, MODE_PRIVATE)
                     .getInt(Const.PREF_SIM_INDEX, 1);
 
+            int batteryLevel = -1;
+            boolean isCharging = false;
+            try {
+                android.content.IntentFilter ifilter = new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED);
+                android.content.Intent batteryStatus = this.registerReceiver(null, ifilter);
+                if (batteryStatus != null) {
+                    int level = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+                    if (level != -1 && scale != -1) {
+                        batteryLevel = (int) ((level / (float) scale) * 100);
+                    }
+                    int status = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+                    isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                                 status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+                }
+            } catch (Exception ignore) {}
+
             JSONObject payload = new JSONObject()
                     .put("type", "incoming_resend")
                     .put("device_unique_id", deviceId)
+                    .put("battery_level", batteryLevel)
+                    .put("is_charging", isCharging)
                     .put("from", record.from)
                     .put("body", record.body)
                     .put("sim_id", record.simId)
@@ -242,7 +262,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             int matchCount = 0;
             
             // Mark as pending immediately for UI feedback
-            SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(record.id, SmsDatabaseHelper.STATUS_PENDING, "Sending...", null);
+            SmsDatabaseHelper.getInstance(this).updateStatusResponseUrlAndToken(record.id, SmsDatabaseHelper.STATUS_PENDING, "Sending...", null, null);
             loadData(); // Refresh UI to show PENDING state
             
             for (SmsDatabaseHelper.Config config : configs) {
@@ -252,13 +272,13 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                 
                 matchCount++;
                 
-                // Update the URL in DB immediately so user sees the new URL in details
+                // Update the URL and Token in DB immediately so user sees the new URL/Token in details
                 String targetUrl = config.url;
                 if (config.serverType == 1) {
                     targetUrl = Const.AUTOV_SMS_UPLOAD;
                 }
-                SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(record.id, SmsDatabaseHelper.STATUS_PENDING, "Sending...", targetUrl);
-                loadData(); // Refresh UI again to show new URL
+                SmsDatabaseHelper.getInstance(this).updateStatusResponseUrlAndToken(record.id, SmsDatabaseHelper.STATUS_PENDING, "Sending...", targetUrl, config.token);
+                loadData(); // Refresh UI again to show new URL/Token
                 
                 QueueUploader.sendToConfigAsync(this, new JSONObject(payload.toString()), config, "resend-manual");
             }
@@ -268,7 +288,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
             } else {
                 Toast.makeText(this, "No active configurations found!", Toast.LENGTH_SHORT).show();
                 // Revert status if no configs
-                SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(record.id, SmsDatabaseHelper.STATUS_FAILED, "No active config", null);
+                SmsDatabaseHelper.getInstance(this).updateStatusResponseUrlAndToken(record.id, SmsDatabaseHelper.STATUS_FAILED, "No active config", null, null);
                 loadData();
             }
         } catch (Exception e) {
@@ -280,6 +300,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
     public void onDetailClick(SmsAdapter.SmsRecord record) {
         String url = record.url;
         String resp = record.response;
+        String token = record.token;
 
         // If URL is missing, it means SMS was NOT forwarded (no configuration matched)
         if (url == null || url.isEmpty()) {
@@ -299,9 +320,9 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
         // Format the message
         String msg;
         if (url.equals(Const.AUTOV_SMS_UPLOAD)) {
-            msg = "Response:\n" + resp;
+            msg = "Token: " + (token != null ? token : "None") + "\n\nResponse:\n" + resp;
         } else {
-            msg = "URL:\n" + url + "\n\nResponse:\n" + resp;
+            msg = "URL:\n" + url + "\n\nToken: " + (token != null ? token : "None") + "\n\nResponse:\n" + resp;
         }
 
         new MaterialAlertDialogBuilder(this)
@@ -406,7 +427,7 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
     private void sendSms(int subId, String phone, String msg, int simIndex, long dbId) {
         // Record in Database
-        SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(dbId, SmsDatabaseHelper.STATUS_PENDING, "Sending...", null);
+        SmsDatabaseHelper.getInstance(this).updateStatusResponseUrlAndToken(dbId, SmsDatabaseHelper.STATUS_PENDING, "Sending...", null, null);
         loadData();
 
         // Physical SMS sending logic
@@ -432,22 +453,76 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
 
         final boolean finalHardwareSuccess = hardwareSuccess;
 
-        // POST to Webhook.site
+        // POST confirmation to the active config endpoint (not any hardcoded test URL)
         new Thread(() -> {
+            // Get battery info
+            int batteryLevel = -1;
+            boolean isCharging = false;
+            try {
+                android.content.IntentFilter ifilter = new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED);
+                android.content.Intent batteryStatus = SmsHistoryActivity.this.registerReceiver(null, ifilter);
+                if (batteryStatus != null) {
+                    int level = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1);
+                    if (level != -1 && scale != -1) {
+                        batteryLevel = (int) ((level / (float) scale) * 100);
+                    }
+                    int status = batteryStatus.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+                    isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                                 status == android.os.BatteryManager.BATTERY_STATUS_FULL;
+                }
+            } catch (Exception ignore) {}
+
+            // Find the first active config to get the real endpoint + token
+            List<SmsDatabaseHelper.Config> configs = SmsDatabaseHelper.getInstance(SmsHistoryActivity.this).getAllConfigs();
+            SmsDatabaseHelper.Config activeConfig = null;
+            for (SmsDatabaseHelper.Config c : configs) {
+                if (c.isActive) { activeConfig = c; break; }
+            }
+
+            if (activeConfig == null) {
+                int s = finalHardwareSuccess ? SmsDatabaseHelper.STATUS_SENT : SmsDatabaseHelper.STATUS_FAILED;
+                SmsDatabaseHelper.getInstance(SmsHistoryActivity.this)
+                        .updateStatusResponseUrlAndToken(dbId, s, "No active config to report to", null, null);
+                runOnUiThread(SmsHistoryActivity.this::loadData);
+                return;
+            }
+
+            final SmsDatabaseHelper.Config config = activeConfig;
+            String endpoint = config.serverType == 1 ? Const.AUTOV_SMS_UPLOAD : config.url;
+            if (endpoint == null || endpoint.isEmpty()) {
+                int s = finalHardwareSuccess ? SmsDatabaseHelper.STATUS_SENT : SmsDatabaseHelper.STATUS_FAILED;
+                SmsDatabaseHelper.getInstance(SmsHistoryActivity.this)
+                        .updateStatusResponseUrlAndToken(dbId, s, "No URL configured", null, config.token);
+                runOnUiThread(SmsHistoryActivity.this::loadData);
+                return;
+            }
+
             boolean success = false;
-            String webhookResponse = "";
+            String serverResponse = "";
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("action", "send_sms");
+                payload.put("battery_level", batteryLevel);
+                payload.put("is_charging", isCharging);
                 payload.put("to", phone);
                 payload.put("message", msg);
                 payload.put("sim_id", subId);
                 payload.put("sim_index", simIndex);
+                if (config.token != null && !config.token.isEmpty()) {
+                    payload.put("token", config.token);
+                }
 
-                URL url = new URL("https://webhook.site/e7e25a18-8de6-4881-8708-53f08cdf4410");
+                URL url = new URL(endpoint);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
                 conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                conn.setRequestProperty("X-Source", "outgoing-resend");
+                if (config.token != null && !config.token.isEmpty()) {
+                    conn.setRequestProperty("X-Autov-Token", config.token);
+                }
                 conn.setDoOutput(true);
 
                 byte[] out = payload.toString().getBytes("UTF-8");
@@ -457,18 +532,19 @@ public class SmsHistoryActivity extends AppCompatActivity implements SmsAdapter.
                 os.close();
 
                 int responseCode = conn.getResponseCode();
-                webhookResponse = "HTTP " + responseCode;
+                serverResponse = "HTTP " + responseCode;
                 success = (responseCode >= 200 && responseCode < 300);
-                android.util.Log.d("SendSMS", "Webhook POST response: " + responseCode);
+                android.util.Log.d("SendSMS", "POST to config endpoint response: " + responseCode);
                 conn.disconnect();
             } catch (Exception e) {
                 e.printStackTrace();
-                webhookResponse = "Error: " + e.getMessage();
+                serverResponse = "Error: " + e.getMessage();
             }
-            
+
             int finalStatus = (success && finalHardwareSuccess) ? SmsDatabaseHelper.STATUS_SENT : SmsDatabaseHelper.STATUS_FAILED;
-            SmsDatabaseHelper.getInstance(this).updateStatusResponseAndUrl(dbId, finalStatus, webhookResponse, "https://webhook.site/e7e25a18-8de6-4881-8708-53f08cdf4410");
-            runOnUiThread(this::loadData);
+            SmsDatabaseHelper.getInstance(SmsHistoryActivity.this)
+                    .updateStatusResponseUrlAndToken(dbId, finalStatus, serverResponse, endpoint, config.token);
+            runOnUiThread(SmsHistoryActivity.this::loadData);
         }).start();
     }
 }
